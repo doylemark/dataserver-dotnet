@@ -1,0 +1,73 @@
+name: Sonar Scan
+
+on:  
+  push:
+  pull_request:
+    branches:
+      - master
+      - develop
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      
+      - name: Setup .NET Core SDK
+        uses: actions/setup-dotnet@v1
+
+      - name: dotnet restore
+        run: |
+          dotnet restore
+          dotnet tool restore # Why do we need both of these?
+      - name: Branch name
+        id: branch_name
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          echo ::set-output name=SOURCE_NAME::${GITHUB_REF#refs/*/}
+          echo ::set-output name=SOURCE_BRANCH::${GITHUB_REF#refs/heads/}
+          echo ::set-output name=SOURCE_TAG::${GITHUB_REF#refs/tags/}
+      - name: Initialize SonarScanner
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          dotnet sonarscanner begin \
+          /k:"DataServer" /n:"DataServer" \
+          /d:sonar.verbose=true \
+          /d:sonar.host.url="$SONAR_HOST" \
+          /d:sonar.login="$SONAR_TOKEN" \
+          /d:sonar.branch.name="${{ steps.branch_name.outputs.SOURCE_BRANCH }}"
+        env:
+          SONAR_HOST: ${{ secrets.SONARQUBE_HOST }}
+          SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Initialize SonarScanner
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          dotnet sonarscanner begin \
+          /k:"DataServer" /n:"DataServer" \
+          /d:sonar.verbose=true \
+          /d:sonar.host.url="$SONAR_HOST" \
+          /d:sonar.login="$SONAR_TOKEN" \
+          /d:sonar.pullrequest.key=${{ github.event.pull_request.number }} \
+          /d:sonar.pullrequest.branch="${{ github.head_ref }}" \
+          /d:sonar.pullrequest.base="${{ github.base_ref }}"
+        env:
+          SONAR_HOST: ${{ secrets.SONARQUBE_HOST }}
+          SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: dotnet build
+        run: dotnet build --configuration Release
+
+      - name: Run SonarScanner
+        run: |
+          dotnet sonarscanner end \
+          /d:sonar.login="$SONAR_TOKEN"
+        env:
+          SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
