@@ -8,7 +8,7 @@ namespace VATSIM.Network.Dataserver.Services
 {
     public class HttpService
     {
-        private readonly RestClient _restClient = new RestClient(Environment.GetEnvironmentVariable("API_URL") ?? "https://api.vatsim.net/api");
+        private readonly RestClient _restClient = new RestClient(Environment.GetEnvironmentVariable("API_URL") ?? string.Empty);
 
         public async Task<ApiUserData> GetUserData(string cid)
         {

@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace VATSIM.Network.Dataserver
 {
-    public class Program
+    public static class Program
     {
         private static readonly FeedVersion1 FeedVersion1 = new FeedVersion1();
         private static readonly FeedVersion3 FeedVersion3 = new FeedVersion3();
