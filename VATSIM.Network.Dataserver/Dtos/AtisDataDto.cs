@@ -25,7 +25,7 @@ namespace VATSIM.Network.Dataserver.Dtos
 
             try
             {
-                return new AtisDataDto(fields[1], fields[2], Convert.ToInt32(fields[3].Substring(1)),
+                return new AtisDataDto(fields[1], fields[2], Convert.ToInt32(fields[3][1..]),
                     Convert.ToInt32(fields[4]), fields[6], fields[8], fields[9]);
             }
             catch (Exception e)

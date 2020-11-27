@@ -43,7 +43,7 @@ namespace VATSIM.Network.Dataserver.Dtos
             try
             {
                 double hdgDbl = ParsePbh(fields[12]);
-                return new PilotDataDto(fields[0], fields[1], Convert.ToInt32(fields[2].Substring(1)),
+                return new PilotDataDto(fields[0], fields[1], Convert.ToInt32(fields[2][1..]),
                     Convert.ToInt32(fields[3]), fields[4], fields[5], Convert.ToInt32(fields[6]),
                     Convert.ToInt32(fields[7]),
                     Convert.ToDouble(fields[8]), Convert.ToDouble(fields[9]), Convert.ToInt32(fields[10]),
@@ -60,7 +60,7 @@ namespace VATSIM.Network.Dataserver.Dtos
         {
             uint pbh = uint.Parse(pbhField);
             uint hdg = (pbh >> 2) & 0x3FF;
-            double hdgDbl = (double) hdg / 1024.0 * 360.0;
+            double hdgDbl = hdg / 1024.0 * 360.0;
             if (hdgDbl < 0.0)
             {
                 hdgDbl += 360.0;

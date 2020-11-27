@@ -23,7 +23,7 @@ namespace VATSIM.Network.Dataserver.Dtos
 
             try
             {
-                return new PingDto(fields[0], fields[1], Convert.ToInt32(fields[2].Substring(1)),
+                return new PingDto(fields[0], fields[1], Convert.ToInt32(fields[2][1..]),
                     Convert.ToInt32(fields[3]), fields[4]);
             }
             catch (Exception e)

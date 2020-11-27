@@ -70,7 +70,7 @@ namespace VATSIM.Network.Dataserver.Dtos
 
             try
             {
-                return new NotifyDto(fields[0], fields[1], Convert.ToInt32(fields[2].Substring(1)),
+                return new NotifyDto(fields[0], fields[1], Convert.ToInt32(fields[2][1..]),
                     Convert.ToInt32(fields[3]), Convert.ToInt32(fields[4]), fields[5], fields[6], fields[7],
                     fields[8], fields[9], Convert.ToInt32(fields[10]), fields[11]);
             }

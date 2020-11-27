@@ -74,7 +74,7 @@ namespace VATSIM.Network.Dataserver.Dtos
 
             try
             {
-                return new AddClientDto(fields[0], fields[1], Convert.ToInt32(fields[2].Substring(1)),
+                return new AddClientDto(fields[0], fields[1], Convert.ToInt32(fields[2][1..]),
                     Convert.ToInt32(fields[3]), fields[4], fields[5], fields[6], Convert.ToInt32(fields[7]),
                     Convert.ToInt32(fields[8]), Convert.ToInt32(fields[9]), fields[10], Convert.ToInt32(fields[11]),
                     Convert.ToInt32(fields[12]));
