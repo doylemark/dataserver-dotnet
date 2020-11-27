@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using System;
+using Newtonsoft.Json;
 using RestSharp;
 using System.Threading.Tasks;
 using VATSIM.Network.Dataserver.Models;
@@ -7,7 +8,7 @@ namespace VATSIM.Network.Dataserver.Services
 {
     public class HttpService
     {
-        readonly RestClient _restClient = new RestClient("https://api.vatsim.net/api");
+        private readonly RestClient _restClient = new RestClient(Environment.GetEnvironmentVariable("API_URL") ?? "https://api.vatsim.net/api");
 
         public async Task<ApiUserData> GetUserData(string cid)
         {

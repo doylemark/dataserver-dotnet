@@ -376,7 +376,7 @@ namespace VATSIM.Network.Dataserver
 
         private async void FillPilotRatings(object source, ElapsedEventArgs e)
         {
-            List<FsdPilot> pilots = _fsdPilots.Where(p => p.PilotRatingSet == false).ToList();
+            List<FsdPilot> pilots = _fsdPilots.Where(p => !p.PilotRatingSet).ToList();
             foreach(FsdPilot pilot in pilots)
             {
                 try

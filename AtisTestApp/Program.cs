@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 
 namespace AtisTestApp
 {
-    internal class Program
+    internal static class Program
     {
         private static readonly List<string> Icaos = new List<string>();
         private static readonly List<string> Phonetics = new List<string>();
@@ -44,8 +44,8 @@ namespace AtisTestApp
                     }
                     break;
                 }
-
             }
+            wc.Dispose();
         }
 
         private static void PopulateAtisIcaos()

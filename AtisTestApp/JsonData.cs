@@ -183,15 +183,13 @@ namespace AtisTestApp
         public string Alternate { get; set; }
 
         [JsonProperty("cruise_tas")]
-        [JsonConverter(typeof(ParseStringConverter))]
-        public long CruiseTas { get; set; }
+        public string CruiseTas { get; set; }
 
         [JsonProperty("altitude")]
         public string Altitude { get; set; }
 
         [JsonProperty("deptime")]
-        [JsonConverter(typeof(ParseStringConverter))]
-        public long Deptime { get; set; }
+        public string Deptime { get; set; }
 
         [JsonProperty("enroute_time")]
         public string EnrouteTime { get; set; }
@@ -240,32 +238,5 @@ namespace AtisTestApp
 
         [JsonProperty("clients_connection_allowed")]
         public long ClientsConnectionAllowed { get; set; }
-    }
-
-    internal class ParseStringConverter : JsonConverter
-    {
-        public override bool CanConvert(Type t) => t == typeof(long) || t == typeof(long?);
-
-        public override object ReadJson(JsonReader reader, Type t, object existingValue, JsonSerializer serializer)
-        {
-            if (reader.TokenType == JsonToken.Null) return null;
-            string value = serializer.Deserialize<string>(reader);
-            if (long.TryParse(value, out long l))
-            {
-                return l;
-            }
-            throw new Exception("Cannot unmarshal type long");
-        }
-
-        public override void WriteJson(JsonWriter writer, object untypedValue, JsonSerializer serializer)
-        {
-            if (untypedValue == null)
-            {
-                serializer.Serialize(writer, null);
-                return;
-            }
-            long value = (long)untypedValue;
-            serializer.Serialize(writer, value.ToString());
-        }
     }
 }
