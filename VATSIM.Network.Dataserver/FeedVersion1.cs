@@ -9,52 +9,50 @@ using System.Timers;
 using System.Linq;
 using VATSIM.Network.Dataserver.Models;
 using Prometheus;
-using System.Threading.Tasks;
 using Amazon.S3;
 using VATSIM.Network.Dataserver.Resources;
 using Newtonsoft.Json.Serialization;
 using Amazon.S3.Model;
 using Newtonsoft.Json;
-using V1Model = VATSIM.Network.Dataserver.Models.V1;
 
 namespace VATSIM.Network.Dataserver
 {
     public class FeedVersion1
     {
-        private readonly HttpService httpService = new HttpService();
+        private readonly HttpService _httpService = new HttpService();
 
-        private readonly FsdConsumer FsdConsumer = new FsdConsumer(Environment.GetEnvironmentVariable("FSD_HOST"), int.Parse(Environment.GetEnvironmentVariable("FSD_PORT")));
-        public readonly string ConsumerName = "DSERVER";
-        public readonly string ConsumerCallsign = "DCLIENT";
+        private readonly FsdConsumer _fsdConsumer = new FsdConsumer(Environment.GetEnvironmentVariable("FSD_HOST"), int.Parse(Environment.GetEnvironmentVariable("FSD_PORT") ?? "4113"));
+        private const string ConsumerName = "DSERVER";
+        private const string ConsumerCallsign = "DCLIENT";
 
-        private readonly LiveFeedProducer LiveFeedProducer = new LiveFeedProducer(Environment.GetEnvironmentVariable("KAFKA_SERVER"), Environment.GetEnvironmentVariable("KAFKA_USERNAME"), Environment.GetEnvironmentVariable("KAFKA_PASSWORD"));
+        private readonly LiveFeedProducer _liveFeedProducer = new LiveFeedProducer(Environment.GetEnvironmentVariable("KAFKA_SERVER"), Environment.GetEnvironmentVariable("KAFKA_USERNAME"), Environment.GetEnvironmentVariable("KAFKA_PASSWORD"));
 
         private readonly List<FsdClient> _fsdClients = new List<FsdClient>();
         private readonly List<FsdClient> _fsdPrefiles = new List<FsdClient>();
         private readonly List<FsdServer> _fsdServers = new List<FsdServer>();
-        private readonly Timer TimeoutTimer = new Timer(60000);
-        private readonly Timer PrometheusMetricsTimer = new Timer(5000);
+        private readonly Timer _timeoutTimer = new Timer(60000);
+        private readonly Timer _prometheusMetricsTimer = new Timer(5000);
 
-        private static Timer FileTimer = new Timer(15000);
-        private static AmazonS3Client AmazonS3Client = new AmazonS3Client(new AmazonS3Config
+        private readonly Timer _fileTimer = new Timer(15000);
+        private static readonly AmazonS3Client AmazonS3Client = new AmazonS3Client(new AmazonS3Config
         {
             ServiceURL = "https://sfo2.digitaloceanspaces.com"
         });
 
-        private readonly Gauge TotalConnections = Prometheus.Metrics.CreateGauge("fsd_total_connections",
+        private readonly Gauge _totalConnections = Prometheus.Metrics.CreateGauge("fsd_total_connections",
             "Total number of connections to the FSD network.", new GaugeConfiguration
             {
                 LabelNames = new[] { "server" },
                 SuppressInitialValue = true
             });
 
-        private readonly Gauge UniqueConnections = Prometheus.Metrics.CreateGauge("fsd_unique_connections",
+        private readonly Gauge _uniqueConnections = Prometheus.Metrics.CreateGauge("fsd_unique_connections",
             "Unique number of connections to the FSD network.", new GaugeConfiguration
             {
                 SuppressInitialValue = true
             });
 
-        private readonly Gauge TotalAtisConnections = Prometheus.Metrics.CreateGauge("fsd_atis_connections",
+        private readonly Gauge _totalAtisConnections = Prometheus.Metrics.CreateGauge("fsd_atis_connections",
             "Number of ATIS connections.", new GaugeConfiguration
             {
                 LabelNames = new[] { "is_empty", "server" },
@@ -69,35 +67,35 @@ namespace VATSIM.Network.Dataserver
 
         public void StartFeedVersion1()
         {
-            FsdConsumer.AddClientDtoReceived += fsdConsumer_AddClientDtoReceived;
-            FsdConsumer.RemoveClientDtoReceived += fsdConsumer_RemoveClientDtoReceived;
-            FsdConsumer.PilotDataDtoReceived += fsdConsumer_PilotDataDtoReceived;
-            FsdConsumer.AtcDataDtoReceived += fsdConsumer_AtcDataDtoReceived;
-            FsdConsumer.FlightPlanDtoReceived += fsdConsumer_FlightPlanDtoReceived;
-            FsdConsumer.FlightPlanCancelDtoReceived += fsdConsumer_FlightPlanCancelDtoReceived;
-            FsdConsumer.AtisDataDtoReceived += fsdConsumer_AtisDataDtoReceived;
-            FsdConsumer.NotifyDtoReceived += fsdConsumer_NotifyDtoReceived;
-            FsdConsumer.WallopDtoReceived += fsdConsumer_WallopDtoReceived;
-            FsdConsumer.BroadcastDtoReceived += fsdConsumer_BroadcastDtoReceived;
-            FsdConsumer.AtisTimer.Elapsed += fsdConsumer_AtisTimerElapsed;
-            TimeoutTimer.Elapsed += RemoveTimedOutConnections;
-            PrometheusMetricsTimer.Elapsed += SetPrometheusConnectionCounts;
+            _fsdConsumer.AddClientDtoReceived += FsdConsumer_AddClientDtoReceived;
+            _fsdConsumer.RemoveClientDtoReceived += FsdConsumer_RemoveClientDtoReceived;
+            _fsdConsumer.PilotDataDtoReceived += FsdConsumer_PilotDataDtoReceived;
+            _fsdConsumer.AtcDataDtoReceived += FsdConsumer_AtcDataDtoReceived;
+            _fsdConsumer.FlightPlanDtoReceived += FsdConsumer_FlightPlanDtoReceived;
+            _fsdConsumer.FlightPlanCancelDtoReceived += FsdConsumer_FlightPlanCancelDtoReceived;
+            _fsdConsumer.AtisDataDtoReceived += FsdConsumer_AtisDataDtoReceived;
+            _fsdConsumer.NotifyDtoReceived += FsdConsumer_NotifyDtoReceived;
+            _fsdConsumer.WallopDtoReceived += FsdConsumer_WallopDtoReceived;
+            _fsdConsumer.BroadcastDtoReceived += FsdConsumer_BroadcastDtoReceived;
+            _fsdConsumer.AtisTimer.Elapsed += FsdConsumer_AtisTimerElapsed;
+            _timeoutTimer.Elapsed += RemoveTimedOutConnections;
+            _prometheusMetricsTimer.Elapsed += SetPrometheusConnectionCounts;
 
-            FsdConsumer.Start(ConsumerName, ConsumerCallsign);
-            TimeoutTimer.Start();
-            FsdConsumer.AtisTimer.Start();
+            _fsdConsumer.Start(ConsumerName, ConsumerCallsign);
+            _timeoutTimer.Start();
+            _fsdConsumer.AtisTimer.Start();
 
-            FileTimer.Elapsed += WriteDataFiles;
-            FileTimer.Start();
+            _fileTimer.Elapsed += WriteDataFiles;
+            _fileTimer.Start();
 
-            PrometheusMetricsTimer.Start();
+            _prometheusMetricsTimer.Start();
             MetricServer metricServer = new MetricServer(port: 8501);
             metricServer.Start();
 
             Console.WriteLine("Starting Feed Version 1 & 2");
         }
 
-        private void fsdConsumer_AddClientDtoReceived(object sender, DtoReceivedEventArgs<AddClientDto> p)
+        private async void FsdConsumer_AddClientDtoReceived(object sender, DtoReceivedEventArgs<AddClientDto> p)
         {
             if (_fsdClients.Any(c => c.Callsign == p.Dto.Callsign) || p.Dto.Callsign == "AFVDATA" || p.Dto.Callsign == "SUP" || p.Dto.Callsign == "DATA" || p.Dto.Callsign == "DATASVR" || p.Dto.Callsign.Contains("DCLIENT") || p.Dto.Callsign == "DATA-TOR")
             {
@@ -119,20 +117,21 @@ namespace VATSIM.Network.Dataserver
             };
             _fsdClients.Add(fsdClient);
             _fsdPrefiles.RemoveAll(f => f.Callsign == p.Dto.Callsign);
-            LiveFeedProducer.ProduceMessage(p.Dto);
+            await _liveFeedProducer.ProduceMessage(p.Dto);
             Console.WriteLine($"{p.Dto.Callsign} connected to the network - {_fsdClients.Count}");
         }
 
-        private void fsdConsumer_RemoveClientDtoReceived(object sender, DtoReceivedEventArgs<RemoveClientDto> p)
+        private async void FsdConsumer_RemoveClientDtoReceived(object sender, DtoReceivedEventArgs<RemoveClientDto> p)
         {
             _fsdClients.RemoveAll(c => c.Callsign == p.Dto.Callsign);
-            LiveFeedProducer.ProduceMessage(p.Dto);
+            await _liveFeedProducer.ProduceMessage(p.Dto);
             Console.WriteLine($"{p.Dto.Callsign} disconnected from the network - {_fsdClients.Count}");
         }
 
-        private void fsdConsumer_PilotDataDtoReceived(object sender, DtoReceivedEventArgs<PilotDataDto> p)
+        private async void FsdConsumer_PilotDataDtoReceived(object sender, DtoReceivedEventArgs<PilotDataDto> p)
         {
             FsdClient fsdClient = _fsdClients.Find(c => c.Callsign == p.Dto.Callsign);
+            if (fsdClient == null) return;
             fsdClient.Transponder = p.Dto.Transponder;
             fsdClient.Latitude = p.Dto.Latitude;
             fsdClient.Longitude = p.Dto.Longitude;
@@ -142,10 +141,10 @@ namespace VATSIM.Network.Dataserver
             fsdClient.QnhIHg = Math.Round(29.92 - (p.Dto.PressureDifference / 1000.0), 2);
             fsdClient.QnhMb = (int)Math.Round(fsdClient.QnhIHg * 33.864);
             fsdClient.LastUpdated = DateTime.UtcNow;
-            LiveFeedProducer.ProduceMessage(p.Dto);
+            await _liveFeedProducer.ProduceMessage(p.Dto);
         }
 
-        private void fsdConsumer_AtcDataDtoReceived(object sender, DtoReceivedEventArgs<AtcDataDto> p)
+        private async void FsdConsumer_AtcDataDtoReceived(object sender, DtoReceivedEventArgs<AtcDataDto> p)
         {
             if (p.Dto.Callsign == "AFVDATA" || p.Dto.Callsign == "SUP" || p.Dto.Callsign == "DATA" || p.Dto.Callsign == "DATASVR" || p.Dto.Callsign.Contains("DCLIENT") || p.Dto.Callsign == "DATA-TOR")
             {
@@ -153,16 +152,17 @@ namespace VATSIM.Network.Dataserver
             }
 
             FsdClient fsdClient = _fsdClients.Find(c => c.Callsign == p.Dto.Callsign);
+            if (fsdClient == null) return;
             fsdClient.Frequency = p.Dto.Frequency.Insert(2, ".").Insert(0, "1");
             fsdClient.Latitude = p.Dto.Latitude;
             fsdClient.Longitude = p.Dto.Longitude;
             fsdClient.Facilitytype = p.Dto.FacilityType;
             fsdClient.Visualrange = p.Dto.VisualRange;
             fsdClient.LastUpdated = DateTime.UtcNow;
-            LiveFeedProducer.ProduceMessage(p.Dto);
+            await _liveFeedProducer.ProduceMessage(p.Dto);
         }
 
-        private async void fsdConsumer_FlightPlanDtoReceived(object sender, DtoReceivedEventArgs<FlightPlanDto> p)
+        private async void FsdConsumer_FlightPlanDtoReceived(object sender, DtoReceivedEventArgs<FlightPlanDto> p)
         {
             try
             {
@@ -170,7 +170,7 @@ namespace VATSIM.Network.Dataserver
                 bool prefile;
                 if (_fsdClients.All(c => c.Callsign != p.Dto.Callsign))
                 {
-                    ApiUserData response = await httpService.GetUserData(p.Dto.Cid);
+                    ApiUserData response = await _httpService.GetUserData(p.Dto.Cid);
                     Console.WriteLine($"Prefile Received for {response.FirstName} {response.LastName}");
                     fsdClient = new FsdClient
                     {
@@ -187,6 +187,7 @@ namespace VATSIM.Network.Dataserver
                     prefile = false;
                 }
 
+                if (fsdClient == null) return;
                 fsdClient.PlannedAircraft = p.Dto.Aircraft;
                 fsdClient.PlannedTascruise = p.Dto.CruiseSpeed;
                 fsdClient.PlannedDepairport = p.Dto.DepartureAirport;
@@ -210,7 +211,7 @@ namespace VATSIM.Network.Dataserver
                 }
 
                 p.Dto.Realname = fsdClient.Realname;
-                LiveFeedProducer.ProduceMessage(p.Dto);
+                await _liveFeedProducer.ProduceMessage(p.Dto);
             }
             catch (Exception e)
             {
@@ -218,36 +219,34 @@ namespace VATSIM.Network.Dataserver
             }
         }
 
-        private void fsdConsumer_FlightPlanCancelDtoReceived(object sender, DtoReceivedEventArgs<FlightPlanCancelDto> p)
+        private async void FsdConsumer_FlightPlanCancelDtoReceived(object sender, DtoReceivedEventArgs<FlightPlanCancelDto> p)
         {
             _fsdPrefiles.RemoveAll(c => c.Callsign == p.Dto.Callsign);
-            LiveFeedProducer.ProduceMessage(p.Dto);
+            await _liveFeedProducer.ProduceMessage(p.Dto);
         }
 
-        private void fsdConsumer_AtisDataDtoReceived(object sender, DtoReceivedEventArgs<AtisDataDto> p)
+        private async void FsdConsumer_AtisDataDtoReceived(object sender, DtoReceivedEventArgs<AtisDataDto> p)
         {
             FsdClient fsdClient = _fsdClients.Find(c => c.Callsign == p.Dto.From);
-            if (p.Dto.Type == "T")
+            if (fsdClient == null) return;
+            switch (p.Dto.Type)
             {
-                if (fsdClient.AppendAtis)
-                {
+                case "T" when fsdClient.AppendAtis:
                     fsdClient.AtisMessage += $"^§{p.Dto.Data}";
-                }
-                else
-                {
+                    break;
+                case "T":
                     fsdClient.AtisMessage = p.Dto.Data;
                     fsdClient.AppendAtis = true;
-                }
-            }
-            else if (p.Dto.Type == "E")
-            {
-                fsdClient.AppendAtis = false;
+                    break;
+                case "E":
+                    fsdClient.AppendAtis = false;
+                    break;
             }
 
-            LiveFeedProducer.ProduceMessage(p.Dto);
+            await _liveFeedProducer.ProduceMessage(p.Dto);
         }
 
-        private void fsdConsumer_NotifyDtoReceived(object sender, DtoReceivedEventArgs<NotifyDto> p)
+        private async void FsdConsumer_NotifyDtoReceived(object sender, DtoReceivedEventArgs<NotifyDto> p)
         {
             if (p.Dto.Hostname == "127.0.0.1" || p.Dto.Name.ToLower().Contains("data") || p.Dto.Name.ToLower().Contains("testing") || p.Dto.Name.ToLower().Contains("afv") || _fsdServers.Any(s => s.Name == p.Dto.Name))
             {
@@ -264,36 +263,37 @@ namespace VATSIM.Network.Dataserver
             };
 
             _fsdServers.Add(fsdServer);
-            LiveFeedProducer.ProduceMessage(p.Dto);
+            await _liveFeedProducer.ProduceMessage(p.Dto);
         }
 
-        private void fsdConsumer_WallopDtoReceived(object sender, DtoReceivedEventArgs<WallopDto> p)
+        private async void FsdConsumer_WallopDtoReceived(object sender, DtoReceivedEventArgs<WallopDto> p)
         {
             FsdClient fsdClient = _fsdClients.Find(c => c.Callsign == p.Dto.From);
-
+            if (fsdClient == null) return;
             p.Dto.Cid = fsdClient.Cid;
             p.Dto.Realname = fsdClient.Realname;
 
             Console.WriteLine($"Wallop from {p.Dto.From} - {fsdClient.Realname}");
-            LiveFeedProducer.ProduceMessage(p.Dto);
+            await _liveFeedProducer.ProduceMessage(p.Dto);
         }
 
-        private void fsdConsumer_BroadcastDtoReceived(object sender, DtoReceivedEventArgs<BroadcastDto> p)
+        private async void FsdConsumer_BroadcastDtoReceived(object sender, DtoReceivedEventArgs<BroadcastDto> p)
         {
             FsdClient fsdClient = _fsdClients.Find(c => c.Callsign == p.Dto.From);
+            if (fsdClient == null) return;
             p.Dto.Cid = fsdClient.Cid;
             p.Dto.Realname = fsdClient.Realname;
 
             Console.WriteLine($"Broadcast from {p.Dto.From} - {fsdClient.Realname}");
-            LiveFeedProducer.ProduceMessage(p.Dto);
+            await _liveFeedProducer.ProduceMessage(p.Dto);
         }
 
-        private void fsdConsumer_AtisTimerElapsed(object source, ElapsedEventArgs e)
+        private void FsdConsumer_AtisTimerElapsed(object source, ElapsedEventArgs e)
         {
-            foreach (AtisRequestDto atisRequestDto in _fsdClients.Select(fsdClient => new AtisRequestDto(fsdClient.Callsign, ConsumerName, FsdConsumer.DtoCount, 1, ConsumerCallsign)))
+            foreach (AtisRequestDto atisRequestDto in _fsdClients.Select(fsdClient => new AtisRequestDto(fsdClient.Callsign, ConsumerName, _fsdConsumer.DtoCount, 1, ConsumerCallsign)))
             {
-                FsdConsumer.Client.Write(atisRequestDto + "\r\n");
-                FsdConsumer.DtoCount++;
+                _fsdConsumer.Client.Write(atisRequestDto + "\r\n");
+                _fsdConsumer.DtoCount++;
             }
         }
 
@@ -307,15 +307,15 @@ namespace VATSIM.Network.Dataserver
         {
             foreach (FsdServer fsdServer in _fsdServers)
             {
-                TotalConnections.WithLabels(fsdServer.Name).Set(_fsdClients.Count(c => c.Server == fsdServer.Name));
-                TotalAtisConnections.WithLabels("true", fsdServer.Name).Set(_fsdClients.Count(c =>
+                _totalConnections.WithLabels(fsdServer.Name).Set(_fsdClients.Count(c => c.Server == fsdServer.Name));
+                _totalAtisConnections.WithLabels("true", fsdServer.Name).Set(_fsdClients.Count(c =>
                     c.Server == fsdServer.Name && c.Callsign.EndsWith("_ATIS") && string.IsNullOrEmpty(c.AtisMessage)));
-                TotalAtisConnections.WithLabels("false", fsdServer.Name).Set(_fsdClients.Count(c =>
+                _totalAtisConnections.WithLabels("false", fsdServer.Name).Set(_fsdClients.Count(c =>
                     c.Server == fsdServer.Name && c.Callsign.EndsWith("_ATIS") &&
                     !string.IsNullOrEmpty(c.AtisMessage)));
             }
 
-            UniqueConnections.Set(_fsdClients.GroupBy(c => c.Cid).Select(g => g.FirstOrDefault()).Count());
+            _uniqueConnections.Set(_fsdClients.GroupBy(c => c.Cid).Select(g => g.FirstOrDefault()).Count());
         }
 
         private string GenerateDataFileText()
@@ -359,24 +359,19 @@ namespace VATSIM.Network.Dataserver
             }
 
             return fileContents.ToString();
-
-            //byte[] isoBytes = Encoding.GetEncoding("ISO-8859-1").GetBytes(fileContents.ToString());
-            //byte[] utf8Bytes = Encoding.Convert(Encoding.GetEncoding("ISO-8859-1"), Encoding.UTF8, isoBytes);
-
-            //string utf8str = Encoding.UTF8.GetString(utf8Bytes);
-
-            //return utf8str;
         }
 
         private JsonGeneralData GenerateGeneralDataForJson(int version)
         {
-            JsonGeneralData generalData = new JsonGeneralData();
-            generalData.Version = version;
-            generalData.Reload = 1;
-            generalData.Update = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-            generalData.UpdateTimestamp = DateTime.UtcNow;
-            generalData.ConnectedClients = _fsdClients.Count;
-            generalData.UniqueUsers = _fsdClients.GroupBy(c => c.Cid).Select(g => g.FirstOrDefault()).Count();
+            JsonGeneralData generalData = new JsonGeneralData
+            {
+                Version = version,
+                Reload = 1,
+                Update = DateTime.UtcNow.ToString("yyyyMMddHHmmss"),
+                UpdateTimestamp = DateTime.UtcNow,
+                ConnectedClients = _fsdClients.Count,
+                UniqueUsers = _fsdClients.GroupBy(c => c.Cid).Select(g => g.FirstOrDefault()).Count()
+            };
 
             return generalData;
         }
@@ -407,13 +402,13 @@ namespace VATSIM.Network.Dataserver
                 });
                 byte[] isoBytes = Encoding.GetEncoding("ISO-8859-1").GetBytes(jsonv1);
                 byte[] utf8Bytes = Encoding.Convert(Encoding.GetEncoding("ISO-8859-1"), Encoding.UTF8, isoBytes);
-                string jsonv1utf8 = Encoding.UTF8.GetString(utf8Bytes);
+                string jsonv1Utf8 = Encoding.UTF8.GetString(utf8Bytes);
 
                 PutObjectRequest jsonPutRequest = new PutObjectRequest
                 {
                     BucketName = "vatsim-data-us",
                     Key = "vatsim-data.json",
-                    ContentBody = jsonv1utf8,
+                    ContentBody = jsonv1Utf8,
                     CannedACL = S3CannedACL.PublicRead
                 };
                 AmazonS3Client.PutObjectAsync(jsonPutRequest);
@@ -427,13 +422,13 @@ namespace VATSIM.Network.Dataserver
             try
             {
                 // json file version 2
-                List<FsdClient> _clients = _fsdClients.ToList();
+                List<FsdClient> clients = _fsdClients.ToList();
 
-                List<FsdClient> _pilots = _clients.Where(client => client.Clienttype == "PILOT").ToList();
-                List<FsdClient> _atc = _clients.Where(client => client.Clienttype == "ATC" && !client.Callsign.ToUpper().Contains("_ATIS")).ToList();
-                List<FsdClient> _atis = _clients.Where(client => client.Clienttype == "ATC" && client.Callsign.ToUpper().Contains("_ATIS")).ToList();
+                List<FsdClient> pilots = clients.Where(client => client.Clienttype == "PILOT").ToList();
+                List<FsdClient> atc = clients.Where(client => client.Clienttype == "ATC" && !client.Callsign.ToUpper().Contains("_ATIS")).ToList();
+                List<FsdClient> atiss = clients.Where(client => client.Clienttype == "ATC" && client.Callsign.ToUpper().Contains("_ATIS")).ToList();
 
-                JsonFileResourceV2 jsonFileResourcev2 = new JsonFileResourceV2(_pilots, _atc, _atis, _fsdServers, _fsdPrefiles, GenerateGeneralDataForJson(2));
+                JsonFileResourceV2 jsonFileResourcev2 = new JsonFileResourceV2(pilots, atc, atiss, _fsdServers, _fsdPrefiles, GenerateGeneralDataForJson(2));
                 string jsonv2 = JsonConvert.SerializeObject(jsonFileResourcev2, new JsonSerializerSettings
                 {
                     ContractResolver = new DefaultContractResolver
@@ -443,12 +438,12 @@ namespace VATSIM.Network.Dataserver
                 });
                 byte[] isoBytes = Encoding.GetEncoding("ISO-8859-1").GetBytes(jsonv2);
                 byte[] utf8Bytes = Encoding.Convert(Encoding.GetEncoding("ISO-8859-1"), Encoding.UTF8, isoBytes);
-                string jsonv2utf8 = Encoding.UTF8.GetString(utf8Bytes);
+                string jsonv2Utf8 = Encoding.UTF8.GetString(utf8Bytes);
                 PutObjectRequest jsonPutRequest2 = new PutObjectRequest
                 {
                     BucketName = "vatsim-data-us",
                     Key = "vatsim-data-v2.json",
-                    ContentBody = jsonv2utf8,
+                    ContentBody = jsonv2Utf8,
                     CannedACL = S3CannedACL.PublicRead
                 };
                 AmazonS3Client.PutObjectAsync(jsonPutRequest2);

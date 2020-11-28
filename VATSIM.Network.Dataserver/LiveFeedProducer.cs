@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Confluent.Kafka;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
@@ -30,7 +31,7 @@ namespace VATSIM.Network.Dataserver
             _producer = new ProducerBuilder<Null, string>(producerConfig).Build();
         }
 
-        public async void ProduceMessage(FsdDto fsdDto)
+        public async Task ProduceMessage(FsdDto fsdDto)
         {
             try
             {

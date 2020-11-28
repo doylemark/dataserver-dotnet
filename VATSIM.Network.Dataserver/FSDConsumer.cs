@@ -37,10 +37,10 @@ namespace VATSIM.Network.Dataserver
             _port = port;
             Client.StringEncoder = System.Text.Encoding.GetEncoding("iso-8859-1");
             Client.Delimiter = 10;
-            Client.DelimiterDataReceived += client_DelimiterDataReceived;
-            PingDtoReceived += fsdConsumer_PingDtoReceived;
-            _serverTimer.Elapsed += fsdConsumer_ServerTimerElapsed;
-            _clientTimer.Elapsed += fsdConsumer_ClientTimerElapsed;
+            Client.DelimiterDataReceived += Client_DelimiterDataReceived;
+            PingDtoReceived += FsdConsumer_PingDtoReceived;
+            _serverTimer.Elapsed += FsdConsumer_ServerTimerElapsed;
+            _clientTimer.Elapsed += FsdConsumer_ClientTimerElapsed;
         }
 
         public void Start(string name, string callsign)
@@ -56,7 +56,7 @@ namespace VATSIM.Network.Dataserver
             Console.WriteLine("FSD Consumer Started");
         }
 
-        private void client_DelimiterDataReceived(object sender, Message packet)
+        private void Client_DelimiterDataReceived(object sender, Message packet)
         {
             try
             {
@@ -97,25 +97,28 @@ namespace VATSIM.Network.Dataserver
                         break;
                     case "MC":
                         fields = packet.MessageString.Replace("\r", "").Split(":");
-                        if (fields[5] == "25")
+                        switch (fields[5])
                         {
-                            AtisDataDto atisDataDto = AtisDataDto.Deserialize(fields);
-                            OnAtisDataDtoReceived(new DtoReceivedEventArgs<AtisDataDto>(atisDataDto));
-                        }
-                        else if (fields[5] == "5" && fields[1] == "*S")
-                        {
-                            WallopDto wallopDto = WallopDto.Deserialize(fields);
-                            OnWallopDtoReceived(new DtoReceivedEventArgs<WallopDto>(wallopDto));
-                        }
-                        else if (fields[5] == "5" && fields[1] == "*")
-                        {
-                            BroadcastDto broadcastDto = BroadcastDto.Deserialize(fields);
-                            OnBroadcastDtoReceived(new DtoReceivedEventArgs<BroadcastDto>(broadcastDto));
+                            case "25":
+                            {
+                                AtisDataDto atisDataDto = AtisDataDto.Deserialize(fields);
+                                OnAtisDataDtoReceived(new DtoReceivedEventArgs<AtisDataDto>(atisDataDto));
+                                break;
+                            }
+                            case "5" when fields[1] == "*S":
+                            {
+                                WallopDto wallopDto = WallopDto.Deserialize(fields);
+                                OnWallopDtoReceived(new DtoReceivedEventArgs<WallopDto>(wallopDto));
+                                break;
+                            }
+                            case "5" when fields[1] == "*":
+                            {
+                                BroadcastDto broadcastDto = BroadcastDto.Deserialize(fields);
+                                OnBroadcastDtoReceived(new DtoReceivedEventArgs<BroadcastDto>(broadcastDto));
+                                break;
+                            }
                         }
 
-                        break;
-                    default:
-                        // Not a DTO we need to handle...
                         break;
                 }
             }
@@ -191,14 +194,14 @@ namespace VATSIM.Network.Dataserver
             handler?.Invoke(this, e);
         }
 
-        private void fsdConsumer_PingDtoReceived(object sender, DtoReceivedEventArgs<PingDto> e)
+        private void FsdConsumer_PingDtoReceived(object sender, DtoReceivedEventArgs<PingDto> e)
         {
             PongDto pongDto = new PongDto(e.Dto.Source, ConsumerName, DtoCount, 1, e.Dto.Data);
             Client.Write(pongDto + "\r\n");
             DtoCount++;
         }
 
-        private void fsdConsumer_ServerTimerElapsed(object source, ElapsedEventArgs e)
+        private void FsdConsumer_ServerTimerElapsed(object source, ElapsedEventArgs e)
         {
             Client.Write($"SYNC:*:{ConsumerName}:B{DtoCount}:1:\r\n");
             DtoCount++;
@@ -209,7 +212,7 @@ namespace VATSIM.Network.Dataserver
             DtoCount++;
         }
 
-        private void fsdConsumer_ClientTimerElapsed(object source, ElapsedEventArgs e)
+        private void FsdConsumer_ClientTimerElapsed(object source, ElapsedEventArgs e)
         {
             AddClientDto addClientDto =
                 new AddClientDto("*", ConsumerName, DtoCount, 1, "0", ConsumerName, ConsumerCallsign, 2, 1, 100, ConsumerCallsign, -1, 1);

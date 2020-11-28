@@ -14,6 +14,7 @@ namespace VATSIM.Network.Dataserver.Models.V3
         public int Rating { get; set; }
         public string Server { get; set; }
         public int VisualRange { get; set; }
+        public string AtisCode { get; set; }
         public List<string> TextAtis { get; set; }
         public DateTime LastUpdated { get; set; }
         public DateTime LogonTime { get; set; }

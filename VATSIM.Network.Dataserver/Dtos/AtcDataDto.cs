@@ -68,7 +68,7 @@ namespace VATSIM.Network.Dataserver.Dtos
 
             try
             {
-                return new AtcDataDto(fields[0], fields[1], Convert.ToInt32(fields[2].Substring(1)),
+                return new AtcDataDto(fields[0], fields[1], Convert.ToInt32(fields[2][1..]),
                     Convert.ToInt32(fields[3]), fields[4], fields[5], Convert.ToInt32(fields[6]),
                     Convert.ToInt32(fields[7]),
                     Convert.ToInt32(fields[8]), Convert.ToDouble(fields[9]), Convert.ToDouble(fields[10]));

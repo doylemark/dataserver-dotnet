@@ -7,9 +7,8 @@ using VATSIM.Network.Dataserver.Services;
 using VATSIM.Network.Dataserver.Dtos;
 using System.Timers;
 using System.Linq;
+using System.Text.RegularExpressions;
 using VATSIM.Network.Dataserver.Models;
-using Prometheus;
-using System.Threading.Tasks;
 using Amazon.S3;
 using VATSIM.Network.Dataserver.Resources;
 using Newtonsoft.Json;
@@ -20,11 +19,11 @@ namespace VATSIM.Network.Dataserver
 {
     public class FeedVersion3
     {
-        private readonly HttpService httpService = new HttpService();
+        private readonly HttpService _httpService = new HttpService();
 
-        private readonly FsdConsumer FsdConsumer = new FsdConsumer(Environment.GetEnvironmentVariable("FSD_HOST"), int.Parse(Environment.GetEnvironmentVariable("FSD_PORT")));
-        public readonly string ConsumerName = "DSERVER3";
-        public readonly string ConsumerCallsign = "DCLIENT3";
+        private readonly FsdConsumer _fsdConsumer = new FsdConsumer(Environment.GetEnvironmentVariable("FSD_HOST"), int.Parse(Environment.GetEnvironmentVariable("FSD_PORT") ?? "4113"));
+        private const string ConsumerName = "DSERVER3";
+        private const string ConsumerCallsign = "DCLIENT3";
 
         private readonly List<FsdPilot> _fsdPilots = new List<FsdPilot>();
         private readonly List<FsdController> _fsdControllers = new List<FsdController>();
@@ -36,40 +35,44 @@ namespace VATSIM.Network.Dataserver
         private readonly List<Rating> _ratings = new List<Rating>();
         private readonly List<PilotRating> _pilotratings = new List<PilotRating>();
 
-        private static readonly Timer FileTimer = new Timer(15000);
+        private readonly List<string> _atisicaos = new List<string>();
+        private readonly List<string> _atisphonetics = new List<string>();
+
+        private readonly Timer _fileTimer = new Timer(15000);
         private static readonly AmazonS3Client AmazonS3Client = new AmazonS3Client(new AmazonS3Config
         {
             ServiceURL = "https://sfo2.digitaloceanspaces.com"
         });
 
-        private readonly Timer TimeoutTimer = new Timer(60000);
-        private readonly Timer PilotRatingTimer = new Timer(60000);
+        private readonly Timer _timeoutTimer = new Timer(60000);
+        private readonly Timer _pilotRatingTimer = new Timer(60000);
         
         public void StartFeedVersion3()
         {
             PopulateFacilityTypes();
             PopulateRatings();
             PopulatePilotRatings();
+            PopulateAtisIcaos();
 
-            FsdConsumer.NotifyDtoReceived += FsdConsumer_NotifyDtoReceived;
-            FsdConsumer.AddClientDtoReceived += FsdConsumer_AddClientDtoReceived;
-            FsdConsumer.RemoveClientDtoReceived += FsdConsumer_RemoveClientDtoReceived;
-            FsdConsumer.PilotDataDtoReceived += FsdConsumer_PilotDataDtoReceived;
-            FsdConsumer.AtcDataDtoReceived += FsdConsumer_AtcDataDtoReceived;
-            FsdConsumer.FlightPlanDtoReceived += FsdConsumer_FlightPlanDtoReceived;
-            FsdConsumer.FlightPlanCancelDtoReceived += FsdConsumer_FlightPlanCancelDtoReceived;
-            FsdConsumer.AtisDataDtoReceived += FsdConsumer_AtisDataDtoReceived;
-            FsdConsumer.AtisTimer.Elapsed += FsdConsumer_AtisTimerElapsed;
-            TimeoutTimer.Elapsed += RemoveTimedOutConnections;
-            FileTimer.Elapsed += WriteDataFiles;
-            PilotRatingTimer.Elapsed += FillPilotRatings;
+            _fsdConsumer.NotifyDtoReceived += FsdConsumer_NotifyDtoReceived;
+            _fsdConsumer.AddClientDtoReceived += FsdConsumer_AddClientDtoReceived;
+            _fsdConsumer.RemoveClientDtoReceived += FsdConsumer_RemoveClientDtoReceived;
+            _fsdConsumer.PilotDataDtoReceived += FsdConsumer_PilotDataDtoReceived;
+            _fsdConsumer.AtcDataDtoReceived += FsdConsumer_AtcDataDtoReceived;
+            _fsdConsumer.FlightPlanDtoReceived += FsdConsumer_FlightPlanDtoReceived;
+            _fsdConsumer.FlightPlanCancelDtoReceived += FsdConsumer_FlightPlanCancelDtoReceived;
+            _fsdConsumer.AtisDataDtoReceived += FsdConsumer_AtisDataDtoReceived;
+            _fsdConsumer.AtisTimer.Elapsed += FsdConsumer_AtisTimerElapsed;
+            _timeoutTimer.Elapsed += RemoveTimedOutConnections;
+            _fileTimer.Elapsed += WriteDataFiles;
+            _pilotRatingTimer.Elapsed += FillPilotRatings;
 
-            FsdConsumer.Start(ConsumerName, ConsumerCallsign);
-            FsdConsumer.AtisTimer.Start();
+            _fsdConsumer.Start(ConsumerName, ConsumerCallsign);
+            _fsdConsumer.AtisTimer.Start();
 
-            TimeoutTimer.Start();
-            FileTimer.Start();
-            PilotRatingTimer.Start();
+            _timeoutTimer.Start();
+            _fileTimer.Start();
+            _pilotRatingTimer.Start();
 
             Console.WriteLine("Starting Feed Version 3");
         }
@@ -135,6 +138,7 @@ namespace VATSIM.Network.Dataserver
         private void FsdConsumer_PilotDataDtoReceived(object sender, DtoReceivedEventArgs<PilotDataDto> p)
         {
             FsdPilot fsdPilot = _fsdPilots.Find(c => c.Callsign == p.Dto.Callsign);
+            if (fsdPilot == null) return;
             fsdPilot.Transponder = p.Dto.Transponder;
             fsdPilot.Latitude = p.Dto.Latitude;
             fsdPilot.Longitude = p.Dto.Longitude;
@@ -156,6 +160,7 @@ namespace VATSIM.Network.Dataserver
             if (!p.Dto.Callsign.ToUpper().Contains("_ATIS"))
             {
                 FsdController fsdController = _fsdControllers.Find(c => c.Callsign == p.Dto.Callsign);
+                if (fsdController == null) return;
                 fsdController.Frequency = p.Dto.Frequency.Insert(2, ".").Insert(0, "1");
                 fsdController.Facility = p.Dto.FacilityType;
                 fsdController.VisualRange = p.Dto.VisualRange;
@@ -164,6 +169,7 @@ namespace VATSIM.Network.Dataserver
             else
             {
                 FsdAtis fsdAtis = _fsdAtiss.Find(c => c.Callsign == p.Dto.Callsign);
+                if (fsdAtis == null) return;
                 fsdAtis.Frequency = p.Dto.Frequency.Insert(2, ".").Insert(0, "1");
                 fsdAtis.Facility = p.Dto.FacilityType;
                 fsdAtis.VisualRange = p.Dto.VisualRange;
@@ -177,36 +183,37 @@ namespace VATSIM.Network.Dataserver
             {
                 if (_fsdPilots.All(c => c.Callsign != p.Dto.Callsign))
                 {
-                    ApiUserData response = await httpService.GetUserData(p.Dto.Cid);
+                    ApiUserData response = await _httpService.GetUserData(p.Dto.Cid);
                     FsdPrefile fsdPilot = new FsdPrefile
                     {
                         Cid = int.Parse(p.Dto.Cid),
                         Name = $"{response.FirstName} {response.LastName}",
                         Callsign = p.Dto.Callsign,
                         LastUpdated = DateTime.UtcNow,
+                        FlightPlan = new FlightPlan
+                        {
+                            FlightRules = p.Dto.Type,
+                            Aircraft = p.Dto.Aircraft,
+                            Departure = p.Dto.DepartureAirport,
+                            Arrival = p.Dto.DestinationAirport,
+                            Alternate = p.Dto.AlternateAirport,
+                            CruiseTas = p.Dto.CruiseSpeed,
+                            Altitude = p.Dto.Altitude,
+                            Deptime = p.Dto.EstimatedDepartureTime,
+                            EnrouteTime = FormatFsdTime(p.Dto.HoursEnroute, p.Dto.MinutesEnroute),
+                            FuelTime = FormatFsdTime(p.Dto.HoursFuel, p.Dto.MinutesFuel),
+                            Remarks = p.Dto.Remarks,
+                            Route = p.Dto.Route
+                        },
                     };
 
-                    fsdPilot.FlightPlan = new FlightPlan
-                    {
-                        FlightRules = p.Dto.Type,
-                        Aircraft = p.Dto.Aircraft,
-                        Departure = p.Dto.DepartureAirport,
-                        Arrival = p.Dto.DestinationAirport,
-                        Alternate = p.Dto.AlternateAirport,
-                        CruiseTas = p.Dto.CruiseSpeed,
-                        Altitude = p.Dto.Altitude,
-                        Deptime = p.Dto.EstimatedDepartureTime,
-                        EnrouteTime = FormatFsdTime(p.Dto.HoursEnroute, p.Dto.MinutesEnroute),
-                        FuelTime = FormatFsdTime(p.Dto.HoursFuel, p.Dto.MinutesFuel),
-                        Remarks = p.Dto.Remarks,
-                        Route = p.Dto.Route
-                    };
 
                     _fsdPrefiles.Add(fsdPilot);
                 }
                 else
                 {
                     FsdPilot fsdPilot = _fsdPilots.Find(c => c.Callsign == p.Dto.Callsign);
+                    if (fsdPilot == null) return;
                     fsdPilot.FlightPlan = new FlightPlan
                     {
                         FlightRules = p.Dto.Type,
@@ -235,17 +242,17 @@ namespace VATSIM.Network.Dataserver
             _fsdPrefiles.RemoveAll(c => c.Callsign == p.Dto.Callsign);
         }
 
-        private string FormatFsdTime(string Hours, string Minutes)
+        private static string FormatFsdTime(string hours, string minutes)
         {
-            if(int.Parse(Hours) < 10)
+            if(int.Parse(hours) < 10)
             {
-                Hours = "0" + Hours;
+                hours = "0" + hours;
             }
-            if(int.Parse(Minutes) < 10)
+            if(int.Parse(minutes) < 10)
             {
-                Minutes = "0" + Minutes;
+                minutes = "0" + minutes;
             }
-            return Hours + Minutes;
+            return hours + minutes;
         }
 
         private void FsdConsumer_AtisDataDtoReceived(object sender, DtoReceivedEventArgs<AtisDataDto> p)
@@ -253,47 +260,46 @@ namespace VATSIM.Network.Dataserver
             if (!p.Dto.From.ToUpper().Contains("_ATIS"))
             {
                 FsdController fsdController = _fsdControllers.Find(c => c.Callsign == p.Dto.From);
-                if (p.Dto.Type == "T")
+                if (fsdController == null) return;
+                switch (p.Dto.Type)
                 {
-                    if (fsdController.AppendAtis)
-                    {
-                        fsdController.TextAtis.Add(p.Dto.Data);
-                    }
-                    else
-                    {
+                    case "T" when fsdController.AppendAtis:
+                        fsdController.TextAtis.Add(new Regex("[ ]{2,}", RegexOptions.None).Replace(p.Dto.Data.ToUpper(), " "));
+                        break;
+                    case "T":
                         fsdController.TextAtis = new List<string>
                         {
-                            p.Dto.Data
+                            new Regex("[ ]{2,}", RegexOptions.None).Replace(p.Dto.Data.ToUpper(), " ")
                         };
                         fsdController.AppendAtis = true;
-                    }
-                }
-                else if (p.Dto.Type == "E")
-                {
-                    fsdController.AppendAtis = false;
+                        break;
+                    case "E":
+                        fsdController.AppendAtis = false;
+                        break;
                 }
             }
             else
             {
                 FsdAtis fsdAtis = _fsdAtiss.Find(c => c.Callsign == p.Dto.From);
-                if (p.Dto.Type == "T")
+                if (fsdAtis == null) return;
+                switch (p.Dto.Type)
                 {
-                    if (fsdAtis.AppendAtis)
-                    {
-                        fsdAtis.TextAtis.Add(p.Dto.Data);
-                    }
-                    else
-                    {
+                    case "A":
+                        fsdAtis.AtisCode = p.Dto.Data.ToUpper();
+                        break;
+                    case "T" when fsdAtis.AppendAtis:
+                        fsdAtis.TextAtis.Add(new Regex("[ ]{2,}", RegexOptions.None).Replace(p.Dto.Data.ToUpper(), " "));
+                        break;
+                    case "T":
                         fsdAtis.TextAtis = new List<string>
                         {
-                            p.Dto.Data
+                            new Regex("[ ]{2,}", RegexOptions.None).Replace(p.Dto.Data.ToUpper(), " ")
                         };
                         fsdAtis.AppendAtis = true;
-                    }
-                }
-                else if (p.Dto.Type == "E")
-                {
-                    fsdAtis.AppendAtis = false;
+                        break;
+                    case "E":
+                        fsdAtis.AppendAtis = false;
+                        break;
                 }
             }
         }
@@ -319,16 +325,44 @@ namespace VATSIM.Network.Dataserver
 
         private void FsdConsumer_AtisTimerElapsed(object source, ElapsedEventArgs e)
         {
-            foreach (AtisRequestDto atisRequestDto in _fsdControllers.Select(fsdClient => new AtisRequestDto(fsdClient.Callsign, ConsumerName, FsdConsumer.DtoCount, 1, ConsumerCallsign)))
+            foreach (AtisRequestDto atisRequestDto in _fsdControllers.Select(fsdClient => new AtisRequestDto(fsdClient.Callsign, ConsumerName, _fsdConsumer.DtoCount, 1, ConsumerCallsign)))
             {
-                FsdConsumer.Client.Write(atisRequestDto + "\r\n");
-                FsdConsumer.DtoCount++;
+                _fsdConsumer.Client.Write(atisRequestDto + "\r\n");
+                _fsdConsumer.DtoCount++;
             }
 
-            foreach (AtisRequestDto atisRequestDto in _fsdAtiss.Select(fsdClient => new AtisRequestDto(fsdClient.Callsign, ConsumerName, FsdConsumer.DtoCount, 1, ConsumerCallsign)))
+            foreach (AtisRequestDto atisRequestDto in _fsdAtiss.Select(fsdClient => new AtisRequestDto(fsdClient.Callsign, ConsumerName, _fsdConsumer.DtoCount, 1, ConsumerCallsign)))
             {
-                FsdConsumer.Client.Write(atisRequestDto + "\r\n");
-                FsdConsumer.DtoCount++;
+                _fsdConsumer.Client.Write(atisRequestDto + "\r\n");
+                _fsdConsumer.DtoCount++;
+            }
+
+            RecalculateAtisIcaos();
+        }
+
+        private void RecalculateAtisIcaos()
+        {
+            List<FsdAtis> atiss = _fsdAtiss.Where(fsdAtis => string.IsNullOrEmpty(fsdAtis.AtisCode)).ToList();
+
+            foreach (FsdAtis atis in atiss)
+            {
+                if (atis.TextAtis == null) return;
+
+                foreach (string line in atis.TextAtis)
+                {
+                    if (!line.Contains("INFORMATION ") && !line.Contains("INFO ") && !line.Contains("INFO ") && !line.Contains("ATIS ")) continue;
+                    string[] strings = line.Split(" ");
+                    foreach (string strin in strings)
+                    {
+                        string clean = strin.Replace(".", string.Empty).Replace(",", string.Empty);
+                        if (!_atisphonetics.Contains(clean) && !_atisicaos.Contains(clean)) continue;
+                        string letter = strin.Substring(0, 1);
+                        
+                        FsdAtis fsdAtis = _fsdAtiss.Find(c => c.Callsign == atis.Callsign);
+                        if (fsdAtis == null) return;
+                        fsdAtis.AtisCode = letter;
+                    }
+                }
             }
         }
 
@@ -342,13 +376,14 @@ namespace VATSIM.Network.Dataserver
 
         private async void FillPilotRatings(object source, ElapsedEventArgs e)
         {
-            List<FsdPilot> _pilots = _fsdPilots.Where(p => p.PilotRatingSet == false).ToList();
-            foreach(FsdPilot pilot in _pilots)
+            List<FsdPilot> pilots = _fsdPilots.Where(p => !p.PilotRatingSet).ToList();
+            foreach(FsdPilot pilot in pilots)
             {
                 try
                 {
-                    ApiUserData response = await httpService.GetUserData(pilot.Cid.ToString());
+                    ApiUserData response = await _httpService.GetUserData(pilot.Cid.ToString());
                     FsdPilot fsdPilot = _fsdPilots.Find(c => c.Cid == pilot.Cid);
+                    if (fsdPilot == null) return;
                     fsdPilot.PilotRating = response.PilotRating;
                     fsdPilot.PilotRatingSet = true;
                 }
@@ -361,23 +396,13 @@ namespace VATSIM.Network.Dataserver
 
         private JsonGeneralData GenerateGeneralDataForV3Json()
         {
-            List<int> _cids = new List<int>();
-            List<FsdPilot> _pilots = _fsdPilots.ToList();
-            List<FsdController> _controller = _fsdControllers.ToList();
-            List<FsdAtis> _atis = _fsdAtiss.ToList();
+            List<FsdPilot> pilots = _fsdPilots.ToList();
+            List<FsdController> controllers = _fsdControllers.ToList();
+            List<FsdAtis> atiss = _fsdAtiss.ToList();
 
-            foreach (FsdPilot pilot in _pilots)
-            {
-                _cids.Add(pilot.Cid);
-            }
-            foreach(FsdController controller in _controller)
-            {
-                _cids.Add(controller.Cid);
-            }
-            foreach(FsdAtis atis in _atis)
-            {
-                _cids.Add(atis.Cid);
-            }
+            List<int> cids = pilots.Select(pilot => pilot.Cid).ToList();
+            cids.AddRange(controllers.Select(controller => controller.Cid));
+            cids.AddRange(atiss.Select(atis => atis.Cid));
 
             JsonGeneralData generalData = new JsonGeneralData
             {
@@ -385,8 +410,8 @@ namespace VATSIM.Network.Dataserver
                 Reload = 1,
                 Update = DateTime.UtcNow.ToString("yyyyMMddHHmmss"),
                 UpdateTimestamp = DateTime.UtcNow,
-                ConnectedClients = _cids.Count,
-                UniqueUsers = _cids.GroupBy(c => c).Select(g => g.FirstOrDefault()).Count()
+                ConnectedClients = cids.Count,
+                UniqueUsers = cids.GroupBy(c => c).Select(g => g.FirstOrDefault()).Count()
             };
 
             return generalData;
@@ -397,12 +422,12 @@ namespace VATSIM.Network.Dataserver
             try
             {
                 // json file version 3
-                List<FsdPilot> _pilots = _fsdPilots.ToList();
-                List<FsdController> _controller = _fsdControllers.ToList();
-                List<FsdAtis> _atis = _fsdAtiss.ToList();
-                List<FsdPrefile> _prefiles = _fsdPrefiles.ToList();
+                List<FsdPilot> pilots = _fsdPilots.ToList();
+                List<FsdController> controllers = _fsdControllers.ToList();
+                List<FsdAtis> atiss = _fsdAtiss.ToList();
+                List<FsdPrefile> prefiles = _fsdPrefiles.ToList();
 
-                JsonFileResourceV3 jsonFileResourcev3 = new JsonFileResourceV3(_pilots, _controller, _atis, _fsdServers, _prefiles, _facilities, _ratings, _pilotratings, GenerateGeneralDataForV3Json());
+                JsonFileResourceV3 jsonFileResourcev3 = new JsonFileResourceV3(pilots, controllers, atiss, _fsdServers, prefiles, _facilities, _ratings, _pilotratings, GenerateGeneralDataForV3Json());
                 string jsonv3 = JsonConvert.SerializeObject(jsonFileResourcev3, new JsonSerializerSettings
                 {
                     ContractResolver = new DefaultContractResolver
@@ -412,12 +437,12 @@ namespace VATSIM.Network.Dataserver
                 });
                 byte[] isoBytes = Encoding.GetEncoding("ISO-8859-1").GetBytes(jsonv3);
                 byte[] utf8Bytes = Encoding.Convert(Encoding.GetEncoding("ISO-8859-1"), Encoding.UTF8, isoBytes);
-                string jsonv3utf8 = Encoding.UTF8.GetString(utf8Bytes);
+                string jsonv3Utf8 = Encoding.UTF8.GetString(utf8Bytes);
                 PutObjectRequest jsonPutRequest3 = new PutObjectRequest
                 {
                     BucketName = "vatsim-data-us",
                     Key = "vatsim-data-v3.json",
-                    ContentBody = jsonv3utf8,
+                    ContentBody = jsonv3Utf8,
                     CannedACL = S3CannedACL.PublicRead
                 };
                 AmazonS3Client.PutObjectAsync(jsonPutRequest3);
@@ -464,6 +489,63 @@ namespace VATSIM.Network.Dataserver
             _pilotratings.Add(new PilotRating { Id = 3, ShortName = "IR", LongName = "Instrument Rating" });
             _pilotratings.Add(new PilotRating { Id = 7, ShortName = "CMEL", LongName = "Commercial Multi-Engine License" });
             _pilotratings.Add(new PilotRating { Id = 15, ShortName = "ATPL", LongName = "Airline Transport Pilot License" });
+        }
+
+        private void PopulateAtisIcaos()
+        {
+            _atisicaos.Add("A");
+            _atisicaos.Add("B");
+            _atisicaos.Add("C");
+            _atisicaos.Add("D");
+            _atisicaos.Add("E");
+            _atisicaos.Add("F");
+            _atisicaos.Add("G");
+            _atisicaos.Add("H");
+            _atisicaos.Add("I");
+            _atisicaos.Add("J");
+            _atisicaos.Add("K");
+            _atisicaos.Add("L");
+            _atisicaos.Add("M");
+            _atisicaos.Add("N");
+            _atisicaos.Add("O");
+            _atisicaos.Add("P");
+            _atisicaos.Add("Q");
+            _atisicaos.Add("R");
+            _atisicaos.Add("S");
+            _atisicaos.Add("T");
+            _atisicaos.Add("U");
+            _atisicaos.Add("V");
+            _atisicaos.Add("W");
+            _atisicaos.Add("X");
+            _atisicaos.Add("Y");
+            _atisicaos.Add("Z");
+            _atisphonetics.Add("ALPHA");
+            _atisphonetics.Add("BRAVO");
+            _atisphonetics.Add("CHARLIE");
+            _atisphonetics.Add("DELTA");
+            _atisphonetics.Add("ECHO");
+            _atisphonetics.Add("FOXTROT");
+            _atisphonetics.Add("GOLF");
+            _atisphonetics.Add("HOTEL");
+            _atisphonetics.Add("INDIA");
+            _atisphonetics.Add("JULIET");
+            _atisphonetics.Add("JULIETT");
+            _atisphonetics.Add("KILO");
+            _atisphonetics.Add("LIMA");
+            _atisphonetics.Add("MIKE");
+            _atisphonetics.Add("NOVEMBER");
+            _atisphonetics.Add("OSCAR");
+            _atisphonetics.Add("PAPA");
+            _atisphonetics.Add("QUEBEC");
+            _atisphonetics.Add("ROMEO");
+            _atisphonetics.Add("SIERRA");
+            _atisphonetics.Add("TANGO");
+            _atisphonetics.Add("UNIFORM");
+            _atisphonetics.Add("VICTOR");
+            _atisphonetics.Add("WHISKEY");
+            _atisphonetics.Add("XRAY");
+            _atisphonetics.Add("YANKEE");
+            _atisphonetics.Add("ZULU");
         }
     }
 }

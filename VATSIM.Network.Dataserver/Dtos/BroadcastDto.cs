@@ -25,7 +25,7 @@ namespace VATSIM.Network.Dataserver.Dtos
 
             try
             {
-                return new BroadcastDto(fields[1], fields[2], Convert.ToInt32(fields[3].Substring(1)),
+                return new BroadcastDto(fields[1], fields[2], Convert.ToInt32(fields[3][1..]),
                     Convert.ToInt32(fields[4]), fields[6], string.Join(":", fields[7..^0]));
             }
             catch (Exception e)
