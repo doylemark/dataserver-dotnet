@@ -264,12 +264,12 @@ namespace VATSIM.Network.Dataserver
                 switch (p.Dto.Type)
                 {
                     case "T" when fsdController.AppendAtis:
-                        fsdController.TextAtis.Add(new Regex("[ ]{2,}", RegexOptions.None).Replace(p.Dto.Data.ToUpper(), " "));
+                        fsdController.TextAtis.Add(new Regex("[ ]{2,}", RegexOptions.None).Replace(p.Dto.Data.ToUpper(), " ").Trim());
                         break;
                     case "T":
                         fsdController.TextAtis = new List<string>
                         {
-                            new Regex("[ ]{2,}", RegexOptions.None).Replace(p.Dto.Data.ToUpper(), " ")
+                            new Regex("[ ]{2,}", RegexOptions.None).Replace(p.Dto.Data.ToUpper(), " ").Trim()
                         };
                         fsdController.AppendAtis = true;
                         break;
@@ -288,12 +288,12 @@ namespace VATSIM.Network.Dataserver
                         fsdAtis.AtisCode = p.Dto.Data.ToUpper();
                         break;
                     case "T" when fsdAtis.AppendAtis:
-                        fsdAtis.TextAtis.Add(new Regex("[ ]{2,}", RegexOptions.None).Replace(p.Dto.Data.ToUpper(), " "));
+                        fsdAtis.TextAtis.Add(new Regex("[ ]{2,}", RegexOptions.None).Replace(p.Dto.Data.ToUpper(), " ").Trim());
                         break;
                     case "T":
                         fsdAtis.TextAtis = new List<string>
                         {
-                            new Regex("[ ]{2,}", RegexOptions.None).Replace(p.Dto.Data.ToUpper(), " ")
+                            new Regex("[ ]{2,}", RegexOptions.None).Replace(p.Dto.Data.ToUpper(), " ").Trim()
                         };
                         fsdAtis.AppendAtis = true;
                         break;
@@ -342,14 +342,16 @@ namespace VATSIM.Network.Dataserver
 
         private void RecalculateAtisIcaos()
         {
-            List<FsdAtis> atiss = _fsdAtiss.Where(fsdAtis => string.IsNullOrEmpty(fsdAtis.AtisCode)).ToList();
+            List<FsdAtis> atiss = _fsdAtiss.ToList();
 
             foreach (FsdAtis atis in atiss)
             {
-                if (atis.TextAtis == null) return;
+                atis.AtisCode = null;
+                if (atis.TextAtis == null) continue;
 
                 foreach (string line in atis.TextAtis)
                 {
+                    if (atis.AtisCode != null) continue;
                     if (!line.Contains("INFORMATION ") && !line.Contains("INFO ") && !line.Contains("INFO ") && !line.Contains("ATIS ")) continue;
                     string[] strings = line.Split(" ");
                     foreach (string strin in strings)
@@ -360,7 +362,9 @@ namespace VATSIM.Network.Dataserver
                         
                         FsdAtis fsdAtis = _fsdAtiss.Find(c => c.Callsign == atis.Callsign);
                         if (fsdAtis == null) return;
+                        atis.AtisCode = null;
                         fsdAtis.AtisCode = letter;
+                        break;
                     }
                 }
             }
