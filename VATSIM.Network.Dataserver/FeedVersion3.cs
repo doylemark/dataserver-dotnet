@@ -325,13 +325,16 @@ namespace VATSIM.Network.Dataserver
 
         private void FsdConsumer_AtisTimerElapsed(object source, ElapsedEventArgs e)
         {
-            foreach (AtisRequestDto atisRequestDto in _fsdControllers.Select(fsdClient => new AtisRequestDto(fsdClient.Callsign, ConsumerName, _fsdConsumer.DtoCount, 1, ConsumerCallsign)))
+            List<FsdController> controllers = _fsdControllers.ToList();
+            List<FsdAtis> atiss = _fsdAtiss.ToList();
+
+            foreach (AtisRequestDto atisRequestDto in controllers.Select(fsdClient => new AtisRequestDto(fsdClient.Callsign, ConsumerName, _fsdConsumer.DtoCount, 1, ConsumerCallsign)))
             {
                 _fsdConsumer.Client.Write(atisRequestDto + "\r\n");
                 _fsdConsumer.DtoCount++;
             }
 
-            foreach (AtisRequestDto atisRequestDto in _fsdAtiss.Select(fsdClient => new AtisRequestDto(fsdClient.Callsign, ConsumerName, _fsdConsumer.DtoCount, 1, ConsumerCallsign)))
+            foreach (AtisRequestDto atisRequestDto in atiss.Select(fsdClient => new AtisRequestDto(fsdClient.Callsign, ConsumerName, _fsdConsumer.DtoCount, 1, ConsumerCallsign)))
             {
                 _fsdConsumer.Client.Write(atisRequestDto + "\r\n");
                 _fsdConsumer.DtoCount++;
