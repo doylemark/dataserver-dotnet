@@ -202,8 +202,8 @@ namespace VATSIM.Network.Dataserver
                             Deptime = p.Dto.EstimatedDepartureTime,
                             EnrouteTime = FormatFsdTime(p.Dto.HoursEnroute, p.Dto.MinutesEnroute),
                             FuelTime = FormatFsdTime(p.Dto.HoursFuel, p.Dto.MinutesFuel),
-                            Remarks = p.Dto.Remarks,
-                            Route = p.Dto.Route
+                            Remarks = p.Dto.Remarks.ToUpper(),
+                            Route = p.Dto.Route.ToUpper()
                         },
                     };
 
@@ -226,8 +226,8 @@ namespace VATSIM.Network.Dataserver
                         Deptime = p.Dto.EstimatedDepartureTime,
                         EnrouteTime = FormatFsdTime(p.Dto.HoursEnroute, p.Dto.MinutesEnroute),
                         FuelTime = FormatFsdTime(p.Dto.HoursFuel, p.Dto.MinutesFuel),
-                        Remarks = p.Dto.Remarks,
-                        Route = p.Dto.Route
+                        Remarks = p.Dto.Remarks.ToUpper(),
+                        Route = p.Dto.Route.ToUpper()
                     };
                 }
             }
