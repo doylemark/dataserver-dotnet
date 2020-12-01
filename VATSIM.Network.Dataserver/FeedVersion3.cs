@@ -139,7 +139,7 @@ namespace VATSIM.Network.Dataserver
         {
             FsdPilot fsdPilot = _fsdPilots.Find(c => c.Callsign == p.Dto.Callsign);
             if (fsdPilot == null) return;
-            fsdPilot.Transponder = p.Dto.Transponder;
+            fsdPilot.Transponder = p.Dto.Transponder.ToString("0000");
             fsdPilot.Latitude = p.Dto.Latitude;
             fsdPilot.Longitude = p.Dto.Longitude;
             fsdPilot.Altitude = p.Dto.Altitude;
@@ -199,7 +199,7 @@ namespace VATSIM.Network.Dataserver
                             Alternate = p.Dto.AlternateAirport,
                             CruiseTas = p.Dto.CruiseSpeed,
                             Altitude = p.Dto.Altitude,
-                            Deptime = p.Dto.EstimatedDepartureTime,
+                            Deptime = int.Parse(p.Dto.EstimatedDepartureTime).ToString("0000"),
                             EnrouteTime = FormatFsdTime(p.Dto.HoursEnroute, p.Dto.MinutesEnroute),
                             FuelTime = FormatFsdTime(p.Dto.HoursFuel, p.Dto.MinutesFuel),
                             Remarks = p.Dto.Remarks.ToUpper(),
@@ -223,7 +223,7 @@ namespace VATSIM.Network.Dataserver
                         Alternate = p.Dto.AlternateAirport,
                         CruiseTas = p.Dto.CruiseSpeed,
                         Altitude = p.Dto.Altitude,
-                        Deptime = p.Dto.EstimatedDepartureTime,
+                        Deptime = int.Parse(p.Dto.EstimatedDepartureTime).ToString("0000"),
                         EnrouteTime = FormatFsdTime(p.Dto.HoursEnroute, p.Dto.MinutesEnroute),
                         FuelTime = FormatFsdTime(p.Dto.HoursFuel, p.Dto.MinutesFuel),
                         Remarks = p.Dto.Remarks.ToUpper(),
@@ -328,6 +328,8 @@ namespace VATSIM.Network.Dataserver
             List<FsdController> controllers = _fsdControllers.ToList();
             List<FsdAtis> atiss = _fsdAtiss.ToList();
 
+            _fsdConsumer.AddClient();
+
             foreach (AtisRequestDto atisRequestDto in controllers.Select(fsdClient => new AtisRequestDto(fsdClient.Callsign, ConsumerName, _fsdConsumer.DtoCount, 1, ConsumerCallsign)))
             {
                 _fsdConsumer.Client.Write(atisRequestDto + "\r\n");
@@ -339,6 +341,8 @@ namespace VATSIM.Network.Dataserver
                 _fsdConsumer.Client.Write(atisRequestDto + "\r\n");
                 _fsdConsumer.DtoCount++;
             }
+
+            _fsdConsumer.DelClient();
 
             RecalculateAtisIcaos();
         }
