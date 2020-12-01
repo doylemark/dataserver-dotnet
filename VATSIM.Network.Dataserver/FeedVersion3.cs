@@ -255,11 +255,6 @@ namespace VATSIM.Network.Dataserver
             return hours + minutes;
         }
 
-        private static string FormatTime(string time)
-        {
-            return string.Format("0000", time);
-        }
-
         private void FsdConsumer_AtisDataDtoReceived(object sender, DtoReceivedEventArgs<AtisDataDto> p)
         {
             if (!p.Dto.From.ToUpper().Contains("_ATIS"))
