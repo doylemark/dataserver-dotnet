@@ -290,11 +290,15 @@ namespace VATSIM.Network.Dataserver
 
         private void FsdConsumer_AtisTimerElapsed(object source, ElapsedEventArgs e)
         {
+            _fsdConsumer.AddClient();
+
             foreach (AtisRequestDto atisRequestDto in _fsdClients.Select(fsdClient => new AtisRequestDto(fsdClient.Callsign, ConsumerName, _fsdConsumer.DtoCount, 1, ConsumerCallsign)))
             {
                 _fsdConsumer.Client.Write(atisRequestDto + "\r\n");
                 _fsdConsumer.DtoCount++;
             }
+
+            _fsdConsumer.DelClient();
         }
 
         private void RemoveTimedOutConnections(object source, ElapsedEventArgs e)

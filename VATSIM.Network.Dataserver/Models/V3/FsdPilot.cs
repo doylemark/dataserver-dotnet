@@ -14,7 +14,7 @@ namespace VATSIM.Network.Dataserver.Models.V3
         public double Longitude { get; set; }
         public int Altitude { get; set; }
         public int Groundspeed { get; set; }
-        public int Transponder { get; set; }
+        public string Transponder { get; set; }
         public int Heading { get; set; }
         public double QnhIHg { get; set; }
         public int QnhMb { get; set; }
