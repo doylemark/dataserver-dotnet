@@ -94,7 +94,8 @@ namespace VATSIM.Network.Dataserver
                     Server = p.Dto.Server,
                     LogonTime = DateTime.UtcNow,
                     LastUpdated = DateTime.UtcNow,
-                    PilotRatingSet = false
+                    PilotRatingSet = false,
+                    Transponder = "0000"
                 };
                 _fsdPilots.Add(fsdPilot);
                 _fsdPrefiles.RemoveAll(f => f.Callsign == p.Dto.Callsign);
