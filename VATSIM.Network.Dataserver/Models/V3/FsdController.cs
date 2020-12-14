@@ -18,5 +18,6 @@ namespace VATSIM.Network.Dataserver.Models.V3
         public DateTime LastUpdated { get; set; }
         public DateTime LogonTime { get; set; }
         [JsonIgnore] public bool AppendAtis { get; set; }
+        [JsonIgnore] public bool HasControllerData { get; set; }
     }
 }

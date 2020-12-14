@@ -41,7 +41,7 @@ namespace VATSIM.Network.Dataserver
         private readonly Timer _fileTimer = new Timer(15000);
         private static readonly AmazonS3Client AmazonS3Client = new AmazonS3Client(new AmazonS3Config
         {
-            ServiceURL = "https://sfo2.digitaloceanspaces.com"
+            ServiceURL = Environment.GetEnvironmentVariable("S3_URL")
         });
 
         private readonly Timer _timeoutTimer = new Timer(60000);
@@ -95,7 +95,7 @@ namespace VATSIM.Network.Dataserver
                     LogonTime = DateTime.UtcNow,
                     LastUpdated = DateTime.UtcNow,
                     PilotRatingSet = false,
-                    Transponder = "0000"
+                    HasPilotData = false
                 };
                 _fsdPilots.Add(fsdPilot);
                 _fsdPrefiles.RemoveAll(f => f.Callsign == p.Dto.Callsign);
@@ -109,7 +109,8 @@ namespace VATSIM.Network.Dataserver
                     Server = p.Dto.Server,
                     Rating = p.Dto.Rating,
                     LogonTime = DateTime.UtcNow,
-                    LastUpdated = DateTime.UtcNow
+                    LastUpdated = DateTime.UtcNow,
+                    HasControllerData = false
                 };
                 _fsdControllers.Add(fsdController);
 
@@ -123,7 +124,8 @@ namespace VATSIM.Network.Dataserver
                     Rating = p.Dto.Rating,
                     Server = p.Dto.Server,
                     LogonTime = DateTime.UtcNow,
-                    LastUpdated = DateTime.UtcNow
+                    LastUpdated = DateTime.UtcNow,
+                    HasControllerData = false
                 };
                 _fsdAtiss.Add(fsdAtis);
             }
@@ -140,6 +142,7 @@ namespace VATSIM.Network.Dataserver
         {
             FsdPilot fsdPilot = _fsdPilots.Find(c => c.Callsign == p.Dto.Callsign);
             if (fsdPilot == null) return;
+            fsdPilot.HasPilotData = true;
             fsdPilot.Transponder = p.Dto.Transponder.ToString("0000");
             fsdPilot.Latitude = p.Dto.Latitude;
             fsdPilot.Longitude = p.Dto.Longitude;
@@ -162,6 +165,7 @@ namespace VATSIM.Network.Dataserver
             {
                 FsdController fsdController = _fsdControllers.Find(c => c.Callsign == p.Dto.Callsign);
                 if (fsdController == null) return;
+                fsdController.HasControllerData = true;
                 fsdController.Frequency = p.Dto.Frequency.Insert(2, ".").Insert(0, "1");
                 fsdController.Facility = p.Dto.FacilityType;
                 fsdController.VisualRange = p.Dto.VisualRange;
@@ -171,6 +175,7 @@ namespace VATSIM.Network.Dataserver
             {
                 FsdAtis fsdAtis = _fsdAtiss.Find(c => c.Callsign == p.Dto.Callsign);
                 if (fsdAtis == null) return;
+                fsdAtis.HasControllerData = true;
                 fsdAtis.Frequency = p.Dto.Frequency.Insert(2, ".").Insert(0, "1");
                 fsdAtis.Facility = p.Dto.FacilityType;
                 fsdAtis.VisualRange = p.Dto.VisualRange;
@@ -185,57 +190,47 @@ namespace VATSIM.Network.Dataserver
                 if (_fsdPilots.All(c => c.Callsign != p.Dto.Callsign))
                 {
                     ApiUserData response = await _httpService.GetUserData(p.Dto.Cid);
-                    FsdPrefile fsdPilot = new FsdPrefile
+                    FsdPrefile fsdPrefile = new FsdPrefile
                     {
                         Cid = int.Parse(p.Dto.Cid),
                         Name = $"{response.FirstName} {response.LastName}",
                         Callsign = p.Dto.Callsign,
                         LastUpdated = DateTime.UtcNow,
-                        FlightPlan = new FlightPlan
-                        {
-                            FlightRules = p.Dto.Type,
-                            Aircraft = p.Dto.Aircraft,
-                            Departure = p.Dto.DepartureAirport,
-                            Arrival = p.Dto.DestinationAirport,
-                            Alternate = p.Dto.AlternateAirport,
-                            CruiseTas = p.Dto.CruiseSpeed,
-                            Altitude = p.Dto.Altitude,
-                            Deptime = int.Parse(p.Dto.EstimatedDepartureTime).ToString("0000"),
-                            EnrouteTime = FormatFsdTime(p.Dto.HoursEnroute, p.Dto.MinutesEnroute),
-                            FuelTime = FormatFsdTime(p.Dto.HoursFuel, p.Dto.MinutesFuel),
-                            Remarks = p.Dto.Remarks.ToUpper(),
-                            Route = p.Dto.Route.ToUpper()
-                        },
+                        FlightPlan = FillFlightPlanFromDto(p.Dto),
                     };
 
-
-                    _fsdPrefiles.Add(fsdPilot);
+                    _fsdPrefiles.Add(fsdPrefile);
                 }
                 else
                 {
                     FsdPilot fsdPilot = _fsdPilots.Find(c => c.Callsign == p.Dto.Callsign);
                     if (fsdPilot == null) return;
-                    fsdPilot.FlightPlan = new FlightPlan
-                    {
-                        FlightRules = p.Dto.Type,
-                        Aircraft = p.Dto.Aircraft,
-                        Departure = p.Dto.DepartureAirport,
-                        Arrival = p.Dto.DestinationAirport,
-                        Alternate = p.Dto.AlternateAirport,
-                        CruiseTas = p.Dto.CruiseSpeed,
-                        Altitude = p.Dto.Altitude,
-                        Deptime = int.Parse(p.Dto.EstimatedDepartureTime).ToString("0000"),
-                        EnrouteTime = FormatFsdTime(p.Dto.HoursEnroute, p.Dto.MinutesEnroute),
-                        FuelTime = FormatFsdTime(p.Dto.HoursFuel, p.Dto.MinutesFuel),
-                        Remarks = p.Dto.Remarks.ToUpper(),
-                        Route = p.Dto.Route.ToUpper()
-                    };
+                    fsdPilot.FlightPlan = FillFlightPlanFromDto(p.Dto);
                 }
             }
             catch (Exception e)
             {
                 Console.WriteLine(e);
             }
+        }
+
+        private static FlightPlan FillFlightPlanFromDto(FlightPlanDto dto)
+        {
+            return new FlightPlan
+            {
+                FlightRules = dto.Type,
+                Aircraft = dto.Aircraft,
+                Departure = dto.DepartureAirport,
+                Arrival = dto.DestinationAirport,
+                Alternate = dto.AlternateAirport,
+                CruiseTas = dto.CruiseSpeed,
+                Altitude = dto.Altitude,
+                Deptime = int.Parse(dto.EstimatedDepartureTime).ToString("0000"),
+                EnrouteTime = FormatFsdTime(dto.HoursEnroute, dto.MinutesEnroute),
+                FuelTime = FormatFsdTime(dto.HoursFuel, dto.MinutesFuel),
+                Remarks = dto.Remarks.ToUpper(),
+                Route = dto.Route.ToUpper()
+            };
         }
 
         private void FsdConsumer_FlightPlanCancelDtoReceived(object sender, DtoReceivedEventArgs<FlightPlanCancelDto> p)
@@ -357,11 +352,8 @@ namespace VATSIM.Network.Dataserver
                 atis.AtisCode = null;
                 if (atis.TextAtis == null) continue;
 
-                foreach (string line in atis.TextAtis)
+                foreach (string[] strings in from line in atis.TextAtis where atis.AtisCode == null where line.Contains("INFORMATION ") || line.Contains("INFO ") || line.Contains("INFO ") || line.Contains("ATIS ") select line.Split(" "))
                 {
-                    if (atis.AtisCode != null) continue;
-                    if (!line.Contains("INFORMATION ") && !line.Contains("INFO ") && !line.Contains("INFO ") && !line.Contains("ATIS ")) continue;
-                    string[] strings = line.Split(" ");
                     foreach (string strin in strings)
                     {
                         string clean = strin.Replace(".", string.Empty).Replace(",", string.Empty);
@@ -408,7 +400,7 @@ namespace VATSIM.Network.Dataserver
 
         private JsonGeneralData GenerateGeneralDataForV3Json()
         {
-            List<FsdPilot> pilots = _fsdPilots.ToList();
+            List<FsdPilot> pilots = _fsdPilots.Where(p => p.HasPilotData).ToList();
             List<FsdController> controllers = _fsdControllers.ToList();
             List<FsdAtis> atiss = _fsdAtiss.ToList();
 
@@ -434,9 +426,9 @@ namespace VATSIM.Network.Dataserver
             try
             {
                 // json file version 3
-                List<FsdPilot> pilots = _fsdPilots.ToList();
-                List<FsdController> controllers = _fsdControllers.ToList();
-                List<FsdAtis> atiss = _fsdAtiss.ToList();
+                List<FsdPilot> pilots = _fsdPilots.Where(p => p.HasPilotData).ToList();
+                List<FsdController> controllers = _fsdControllers.Where(p => p.HasControllerData).ToList();
+                List<FsdAtis> atiss = _fsdAtiss.Where(p => p.HasControllerData).ToList();
                 List<FsdPrefile> prefiles = _fsdPrefiles.ToList();
 
                 JsonFileResourceV3 jsonFileResourcev3 = new JsonFileResourceV3(pilots, controllers, atiss, _fsdServers, prefiles, _facilities, _ratings, _pilotratings, GenerateGeneralDataForV3Json());
@@ -452,7 +444,7 @@ namespace VATSIM.Network.Dataserver
                 string jsonv3Utf8 = Encoding.UTF8.GetString(utf8Bytes);
                 PutObjectRequest jsonPutRequest3 = new PutObjectRequest
                 {
-                    BucketName = "vatsim-data-us",
+                    BucketName = Environment.GetEnvironmentVariable("S3_BUCKET"),
                     Key = "vatsim-data-v3.json",
                     ContentBody = jsonv3Utf8,
                     CannedACL = S3CannedACL.PublicRead

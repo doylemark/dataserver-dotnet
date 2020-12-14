@@ -22,5 +22,6 @@ namespace VATSIM.Network.Dataserver.Models.V3
         public DateTime LogonTime { get; set; }
         public DateTime LastUpdated { get; set; }
         [JsonIgnore] public bool PilotRatingSet { get; set; }
+        [JsonIgnore] public bool HasPilotData { get; set; }
     }
 }
