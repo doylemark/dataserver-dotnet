@@ -36,7 +36,7 @@ namespace VATSIM.Network.Dataserver
         private readonly Timer _fileTimer = new Timer(15000);
         private static readonly AmazonS3Client AmazonS3Client = new AmazonS3Client(new AmazonS3Config
         {
-            ServiceURL = "https://sfo2.digitaloceanspaces.com"
+            ServiceURL = Environment.GetEnvironmentVariable("S3_URL")
         });
 
         private readonly Gauge _totalConnections = Prometheus.Metrics.CreateGauge("fsd_total_connections",
@@ -388,7 +388,7 @@ namespace VATSIM.Network.Dataserver
                 string contents = GenerateDataFileText();
                 PutObjectRequest txtPutRequest = new PutObjectRequest
                 {
-                    BucketName = "vatsim-data-us",
+                    BucketName = Environment.GetEnvironmentVariable("S3_BUCKET"),
                     Key = "vatsim-data.txt",
                     ContentBody = contents,
                     CannedACL = S3CannedACL.PublicRead
@@ -410,7 +410,7 @@ namespace VATSIM.Network.Dataserver
 
                 PutObjectRequest jsonPutRequest = new PutObjectRequest
                 {
-                    BucketName = "vatsim-data-us",
+                    BucketName = Environment.GetEnvironmentVariable("S3_BUCKET"),
                     Key = "vatsim-data.json",
                     ContentBody = jsonv1Utf8,
                     CannedACL = S3CannedACL.PublicRead
@@ -445,7 +445,7 @@ namespace VATSIM.Network.Dataserver
                 string jsonv2Utf8 = Encoding.UTF8.GetString(utf8Bytes);
                 PutObjectRequest jsonPutRequest2 = new PutObjectRequest
                 {
-                    BucketName = "vatsim-data-us",
+                    BucketName = Environment.GetEnvironmentVariable("S3_BUCKET"),
                     Key = "vatsim-data-v2.json",
                     ContentBody = jsonv2Utf8,
                     CannedACL = S3CannedACL.PublicRead
