@@ -3,6 +3,7 @@ WORKDIR /app
 
 # copy csproj and restore as distinct layers
 COPY VATSIM.Network.Dataserver/*.csproj ./VATSIM.Network.Dataserver/
+COPY Models/*.csproj ./Models/
 WORKDIR /app/VATSIM.Network.Dataserver
 RUN dotnet restore
 
