@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>VATSIM.Network.Dataserver.Models</AssemblyName>
+    <RootNamespace>VATSIM.Network.Dataserver.Models</RootNamespace>
+    <VersionPrefix>1.0.0</VersionPrefix>
+    <Description>Model/DTO classes for the VATSIM Network Data Server.</Description>
+    <Authors>VATSIM Network</Authors>
+    <Owners>VATSIM Network</Owners>
+    <Copyright>2020 VATSIM.net</Copyright>
+    <license>AGPL-3.0-or-later</license>
+    <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+    <RequireLicenseAcceptance>true</RequireLicenseAcceptance>
+    <ProjectUrl>https://github.com/vatsimnetwork/dataserver-dotnet</ProjectUrl>
+    <PackageProjectUrl>https://github.com/vatsimnetwork/dataserver-dotnet</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/vatsimnetwork/dataserver-dotnet.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
+  </ItemGroup>
+
+</Project>

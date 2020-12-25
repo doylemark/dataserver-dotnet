@@ -1,20 +1,19 @@
 using System.Collections.Generic;
-using VATSIM.Network.Dataserver.Models;
 using VATSIM.Network.Dataserver.Models.V3;
 
-namespace VATSIM.Network.Dataserver.Resources
+namespace VATSIM.Network.Dataserver.Models.Resources
 {
     public class JsonFileResourceV3
     {
-        public JsonGeneralData General { get; }
-        public List<FsdPilot> Pilots { get; }
-        public List<FsdController> Controllers { get; }
-        public List<FsdAtis> Atis { get; }
-        public List<FsdServer> Servers { get; }
-        public List<FsdPrefile> Prefiles { get; }
-        public List<AtcFacility> Facilities { get; }
-        public List<Rating> Ratings { get; }
-        public List<PilotRating> PilotRatings { get; }
+        public JsonGeneralData General { get; set; }
+        public List<FsdPilot> Pilots { get; set; }
+        public List<FsdController> Controllers { get; set; }
+        public List<FsdAtis> Atis { get; set; }
+        public List<FsdServer> Servers { get; set; }
+        public List<FsdPrefile> Prefiles { get; set; }
+        public List<AtcFacility> Facilities { get; set; }
+        public List<Rating> Ratings { get; set; }
+        public List<PilotRating> PilotRatings { get; set; }
 
         public JsonFileResourceV3(List<FsdPilot> pilots, List<FsdController> controllers, List<FsdAtis> atis, List<FsdServer> servers, List<FsdPrefile> prefiles, List<AtcFacility> facilities, List<Rating> ratings, List<PilotRating> pilotRatings, JsonGeneralData generalData)
         {

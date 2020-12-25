@@ -15,4 +15,8 @@
         <PackageReference Include="SimpleTCP" Version="1.0.24" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\Models\Models.csproj" />
+    </ItemGroup>
+
 </Project>
