@@ -10,6 +10,7 @@ RUN dotnet restore
 # copy and publish app and libraries
 WORKDIR /app/
 COPY VATSIM.Network.Dataserver/. ./VATSIM.Network.Dataserver/
+COPY Models/. ./Models/
 WORKDIR /app/VATSIM.Network.Dataserver
 RUN dotnet publish -c Release -o out
 
