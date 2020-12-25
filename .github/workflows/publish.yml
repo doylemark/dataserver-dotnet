@@ -1,0 +1,52 @@
+name: NuGet Publish
+
+on:  
+  push:
+    branches:
+      - master
+      - develop
+    paths:
+      - 'Models/**'
+      - '.github/workflows/publish.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # These are only here in case we decide to push non-master builds
+      - name: Set alpha version suffix
+        run: echo "VERSION_SUFFIX=alpha.$GITHUB_RUN_NUMBER" >> $GITHUB_ENV
+        if: startsWith(github.ref, 'refs/heads/feature/')
+
+      - name: Set beta version suffix
+        run: echo "VERSION_SUFFIX=beta.$GITHUB_RUN_NUMBER" >> $GITHUB_ENV
+        if: github.ref == 'refs/heads/develop'
+
+      - name: Set release version suffix
+        run: echo "VERSION_SUFFIX=RC.$GITHUB_RUN_NUMBER" >> $GITHUB_ENV
+        if: startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/hotfix/')
+
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET Core SDK
+        uses: actions/setup-dotnet@v1
+
+      - name: dotnet restore
+        run: |
+          dotnet restore
+      
+      - name: dotnet build
+        run: dotnet build --configuration Release
+
+      - name: dotnet pack
+        run: dotnet pack Models/Models.csproj --configuration Release --version-suffix "$VERSION_SUFFIX"
+
+      - name: dotnet push
+        run: dotnet nuget push "Models/bin/Release/*.nupkg" -k $NUGET_ORG_API_KEY -s "https://api.nuget.org/v3/index.json"
+        env:
+          NUGET_ORG_API_KEY: ${{ secrets.NUGET_ORG_API_KEY }}
+        if: github.ref == 'refs/heads/master'
