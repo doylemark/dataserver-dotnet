@@ -79,7 +79,7 @@ namespace VATSIM.Network.Dataserver
 
         private void FsdConsumer_AddClientDtoReceived(object sender, DtoReceivedEventArgs<AddClientDto> p)
         {
-            if (_fsdPilots.Any(c => c.Callsign == p.Dto.Callsign) || _fsdControllers.Any(c => c.Callsign == p.Dto.Callsign) || _fsdAtiss.Any(c => c.Callsign == p.Dto.Callsign) || p.Dto.Callsign == "AFVDATA" || p.Dto.Callsign == "SUP" || p.Dto.Callsign == "DATA" || p.Dto.Callsign == "DATASVR" || p.Dto.Callsign.Contains("DCLIENT") || p.Dto.Callsign == "DATA-TOR" || p.Dto.Callsign.Substring(0, 4) == "AFVS")
+            if (_fsdPilots.Any(c => c.Callsign == p.Dto.Callsign) || _fsdControllers.Any(c => c.Callsign == p.Dto.Callsign) || _fsdAtiss.Any(c => c.Callsign == p.Dto.Callsign) || p.Dto.Callsign == "AFVDATA" || p.Dto.Callsign == "SUP" || p.Dto.Callsign == "DATA" || p.Dto.Callsign == "DATASVR" || p.Dto.Callsign.Contains("DCLIENT") || p.Dto.Callsign == "DATA-TOR" || (p.Dto.Callsign.Length > 3 && p.Dto.Callsign.Substring(0, 4) == "AFVS"))
             {
                 return;
             }
@@ -156,7 +156,7 @@ namespace VATSIM.Network.Dataserver
 
         private void FsdConsumer_AtcDataDtoReceived(object sender, DtoReceivedEventArgs<AtcDataDto> p)
         {
-            if (p.Dto.Callsign == "AFVDATA" || p.Dto.Callsign == "SUP" || p.Dto.Callsign == "DATA" || p.Dto.Callsign == "DATASVR" || p.Dto.Callsign.Contains("DCLIENT") || p.Dto.Callsign == "DATA-TOR" || p.Dto.Callsign.Substring(0, 4) == "AFVS")
+            if (p.Dto.Callsign == "AFVDATA" || p.Dto.Callsign == "SUP" || p.Dto.Callsign == "DATA" || p.Dto.Callsign == "DATASVR" || p.Dto.Callsign.Contains("DCLIENT") || p.Dto.Callsign == "DATA-TOR" || (p.Dto.Callsign.Length > 3 && p.Dto.Callsign.Substring(0, 4) == "AFVS"))
             {
                 return;
             }
