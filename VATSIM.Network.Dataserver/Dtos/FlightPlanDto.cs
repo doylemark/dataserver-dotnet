@@ -23,7 +23,7 @@ namespace VATSIM.Network.Dataserver.Dtos
         public string Remarks { get; }
         public string Route { get; }
         public string Cid { get; }
-        public string Realname { get; set; }
+        public string RealName { get; set; }
         public bool Prefile { get; set; }
 
         public FlightPlanDto(string destination, string source, int packetNumber, int hopCount, string callsign,
