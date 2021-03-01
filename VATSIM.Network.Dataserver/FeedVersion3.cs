@@ -251,7 +251,6 @@ namespace VATSIM.Network.Dataserver
                     return aircraft;
 
                 // B77W/H-SDE1E3FGHIJ3J5J6M1M2P2RWXYZ/LB1D1
-                // B772/H-B
                 // B77W/H-L/L
                 if (forwardslashcount >= 2 && isIcao)
                     return ConvertIcaoToFaaAircraft(aircraft, forwardslashcount);
@@ -288,8 +287,11 @@ namespace VATSIM.Network.Dataserver
                 if (forwardslashcount == 1 && !isIcao)
                     return aircraft.Substring(0, 2) == "H/" ? aircraft[2..] : aircraft.Substring(0, aircraft.IndexOf('/'));
 
-                // B77W/H-SDE1E3FGHIJ3J5J6M1M2P2RWXYZ/LB1D1
                 // B772/H-B
+                if (forwardslashcount == 1 && isIcao)
+                    return aircraft.Substring(0, aircraft.IndexOf('/'));
+
+                // B77W/H-SDE1E3FGHIJ3J5J6M1M2P2RWXYZ/LB1D1
                 // B77W/H-L/L
                 if (forwardslashcount >= 2 && isIcao)
                     return aircraft.Substring(0, aircraft.IndexOf('/'));
@@ -325,7 +327,7 @@ namespace VATSIM.Network.Dataserver
                     string nav = parts[2];
 
                     return wake == "H" || wake == "J"
-                        ? wake + "/" + wake + "/" + nav.Substring(0, 1)
+                        ? wake + "/" + icao + "/" + nav.Substring(0, 1)
                         : icao + "/" + nav.Substring(0, 1);
                 }
 
@@ -342,12 +344,12 @@ namespace VATSIM.Network.Dataserver
                     if (nav.Length == 1)
                     {
                         return wake == "H" || wake == "J"
-                            ? wake + "/" + wake + "/" + nav
+                            ? wake + "/" + icao + "/" + nav
                             : icao + "/" + nav;
                     }
 
                     return wake == "H" || wake == "J"
-                        ? wake + "/" + wake + "/" + IcaoEquipToFaaSuffix(nav, transponder)
+                        ? wake + "/" + icao + "/" + IcaoEquipToFaaSuffix(nav, transponder)
                         : icao + "/" + IcaoEquipToFaaSuffix(nav, transponder);
                 }
 
