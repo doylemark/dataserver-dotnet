@@ -220,6 +220,8 @@ namespace VATSIM.Network.Dataserver
             {
                 FlightRules = dto.Type,
                 Aircraft = dto.Aircraft,
+                AircraftFaa = AircraftFaa(dto.Aircraft),
+                AircraftShort = AircraftShort(dto.Aircraft),
                 Departure = dto.DepartureAirport,
                 Arrival = dto.DestinationAirport,
                 Alternate = dto.AlternateAirport,
@@ -231,6 +233,204 @@ namespace VATSIM.Network.Dataserver
                 Remarks = dto.Remarks.ToUpper(),
                 Route = dto.Route.ToUpper()
             };
+        }
+        private static string AircraftFaa(string aircraft)
+        {
+            try
+            {
+                int forwardslashcount = Regex.Matches(aircraft, "/").Count;
+                bool isIcao = IsIcao(aircraft);
+
+                // A20N
+                if (forwardslashcount == 0)
+                    return aircraft;
+
+                // H/B744
+                // B739/L
+                if (forwardslashcount == 1 && !isIcao)
+                    return aircraft;
+
+                // B77W/H-SDE1E3FGHIJ3J5J6M1M2P2RWXYZ/LB1D1
+                // B772/H-B
+                // B77W/H-L/L
+                if (forwardslashcount >= 2 && isIcao)
+                    return ConvertIcaoToFaaAircraft(aircraft, forwardslashcount);
+
+                // H/B772/L
+                if (forwardslashcount == 2 && !isIcao)
+                    return aircraft;
+
+                return "";
+            }
+            catch (Exception)
+            {
+                return "";
+            }
+        }
+
+
+        /*
+         * this is to only return the aircraft type wihout any navigation equipment/wake cat
+         */
+        private static string AircraftShort(string aircraft)
+        {
+            try
+            {
+                int forwardslashcount = Regex.Matches(aircraft, "/").Count;
+                bool isIcao = IsIcao(aircraft);
+
+                // A20N
+                if (forwardslashcount == 0)
+                    return aircraft;
+
+                // H/B744
+                // B739/L
+                if (forwardslashcount == 1 && !isIcao)
+                    return aircraft.Substring(0, 2) == "H/" ? aircraft[2..] : aircraft.Substring(0, aircraft.IndexOf('/'));
+
+                // B77W/H-SDE1E3FGHIJ3J5J6M1M2P2RWXYZ/LB1D1
+                // B772/H-B
+                // B77W/H-L/L
+                if (forwardslashcount >= 2 && isIcao)
+                    return aircraft.Substring(0, aircraft.IndexOf('/'));
+
+                // H/B772/L
+                if (forwardslashcount == 2 && !isIcao)
+                    return aircraft.Split("/")[1];
+
+                return "";
+            }
+            catch (Exception)
+            {
+                return "";
+            }
+        }
+
+        private static bool IsIcao(string aircraft)
+        {
+            return aircraft.Contains("-");
+        }
+
+        private static string ConvertIcaoToFaaAircraft(string aircraft, int slashcount)
+        {
+            try
+            {
+                // B772/H-B
+                // something here is wrong so lets assume this is aircraft/wake-faa nav
+                if (slashcount == 1)
+                {
+                    string[] parts = aircraft.Split(new[] { "-", "/" }, StringSplitOptions.RemoveEmptyEntries);
+                    string icao = parts[0];
+                    string wake = parts[1];
+                    string nav = parts[2];
+
+                    return wake == "H" || wake == "J"
+                        ? wake + "/" + wake + "/" + nav.Substring(0, 1)
+                        : icao + "/" + nav.Substring(0, 1);
+                }
+
+                // B77W/H-SDE1E3FGHIJ3J5J6M1M2P2RWXYZ/LB1D1
+                // B77W/H-L/L
+                if (slashcount == 2)
+                {
+                    string[] parts = aircraft.Split(new[] { "-", "/" }, StringSplitOptions.RemoveEmptyEntries);
+                    string icao = parts[0];
+                    string wake = parts[1];
+                    string nav = parts[2];
+                    string transponder = parts[3];
+
+                    if (nav.Length == 1)
+                    {
+                        return wake == "H" || wake == "J"
+                            ? wake + "/" + wake + "/" + nav
+                            : icao + "/" + nav;
+                    }
+
+                    return wake == "H" || wake == "J"
+                        ? wake + "/" + wake + "/" + IcaoEquipToFaaSuffix(nav, transponder)
+                        : icao + "/" + IcaoEquipToFaaSuffix(nav, transponder);
+                }
+
+                return "";
+            }
+            catch (Exception)
+            {
+                return "";
+            }
+        }
+
+        private static string IcaoEquipToFaaSuffix(string equipment, string transponder)
+        {
+            try
+            {
+                if (equipment.Contains("G") && equipment.Contains("W") &&
+                    new[] {"C", "P", "S", "E", "H", "L"}.Any(transponder.Contains))
+                    return "L";
+
+                if (new[] {"R", "C", "I", "X"}.Any(equipment.Contains) && equipment.Contains("W") &&
+                    new[] {"C", "P", "S", "E", "H", "L"}.Any(transponder.Contains))
+                    return "Z";
+
+                if (equipment.Contains("W") && new[] {"C", "P", "S", "E", "H", "L"}.Any(transponder.Contains))
+                    return "W";
+
+                if (equipment.Contains("W") && new[] {"A", "X", "I", "N"}.Any(transponder.Contains))
+                    return "H";
+
+                if (equipment.Contains("G") && new[] {"C", "P", "S", "E", "H", "L"}.Any(transponder.Contains))
+                    return "G";
+
+                if (equipment.Contains("G") && new[] {"A", "X", "I"}.Any(transponder.Contains))
+                    return "S";
+
+                if (equipment.Contains("G") && (transponder.Contains("N") || transponder == ""))
+                    return "V";
+
+                if (new[] {"R", "C", "I", "X"}.Any(equipment.Contains) &&
+                    new[] {"C", "P", "S", "E", "H", "L"}.Any(transponder.Contains))
+                    return "I";
+
+                if (new[] {"R", "C", "I", "X"}.Any(equipment.Contains) &&
+                    new[] {"A", "X", "I"}.Any(transponder.Contains))
+                    return "C";
+
+                if (new[] {"R", "C", "I", "X"}.Any(equipment.Contains) &&
+                    (transponder.Contains("N") || transponder == ""))
+                    return "Y";
+
+                if (equipment.Contains("D") && new[] {"C", "P", "S", "E", "H", "L"}.Any(transponder.Contains))
+                    return "A";
+
+                if (equipment.Contains("D") && new[] {"A", "X", "I"}.Any(transponder.Contains))
+                    return "B";
+
+                if (equipment.Contains("D") && (transponder.Contains("N") || transponder == ""))
+                    return "D";
+
+                if (equipment.Contains("T") && new[] {"C", "P", "S", "E", "H", "L"}.Any(transponder.Contains))
+                    return "P";
+
+                if (equipment.Contains("T") && new[] {"A", "X", "I"}.Any(transponder.Contains))
+                    return "N";
+
+                if (equipment.Contains("T") && (transponder.Contains("N") || transponder == ""))
+                    return "M";
+
+                if (new[] {"C", "P", "S", "E", "H", "L"}.Any(transponder.Contains))
+                    return "U";
+
+                if (new[] {"A", "X", "I"}.Any(transponder.Contains))
+                    return "T";
+
+                if (transponder.Contains("N") || transponder == "")
+                    return "X";
+
+                return "";
+            }
+            catch (Exception)
+            {
+                return "";
+            }
         }
 
         private void FsdConsumer_FlightPlanCancelDtoReceived(object sender, DtoReceivedEventArgs<FlightPlanCancelDto> p)
