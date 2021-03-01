@@ -4,11 +4,11 @@
     {
         public string FlightRules { get; set; }
         public string Aircraft { get; set; }
-
+        public string AircraftFaa { get; set; }
+        public string AircraftShort { get; set; }
         public string Departure { get; set; }
         public string Arrival { get; set; }
         public string Alternate { get; set; }
-
         public string CruiseTas { get; set; }
         public string Altitude { get; set; }
         public string Deptime { get; set; }
