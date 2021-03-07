@@ -16,5 +16,6 @@
         public string FuelTime { get; set; }
         public string Remarks { get; set; }
         public string Route { get; set; }
+        public int RevisionId { get; set; }
     }
 }

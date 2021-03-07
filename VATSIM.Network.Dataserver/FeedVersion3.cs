@@ -90,6 +90,12 @@ namespace VATSIM.Network.Dataserver
                 SuppressInitialValue = true
             });
 
+        private readonly Gauge _prefilesCounter = Prometheus.Metrics.CreateGauge("fsd_prefile_count",
+            "Count of prefiles", new GaugeConfiguration
+            {
+                SuppressInitialValue = true
+            });
+
         private readonly Gauge _atisStatusCounter = Prometheus.Metrics.CreateGauge("fsd_atis_status",
             "Number of ATIS connections.", new GaugeConfiguration
             {
@@ -259,23 +265,32 @@ namespace VATSIM.Network.Dataserver
             {
                 if (_fsdPilots.All(c => c.Callsign != p.Dto.Callsign))
                 {
-                    ApiUserData response = await _httpService.GetUserData(p.Dto.Cid);
-                    FsdPrefile fsdPrefile = new FsdPrefile
+                    if (_fsdPrefiles.All(c => c.Callsign != p.Dto.Callsign))
                     {
-                        Cid = int.Parse(p.Dto.Cid),
-                        Name = $"{response.FirstName} {response.LastName}",
-                        Callsign = p.Dto.Callsign,
-                        LastUpdated = DateTime.UtcNow,
-                        FlightPlan = FillFlightPlanFromDto(p.Dto),
-                    };
+                        ApiUserData response = await _httpService.GetUserData(p.Dto.Cid);
+                        FsdPrefile fsdPrefile = new FsdPrefile
+                        {
+                            Cid = int.Parse(p.Dto.Cid),
+                            Name = $"{response.FirstName} {response.LastName}",
+                            Callsign = p.Dto.Callsign,
+                            LastUpdated = DateTime.UtcNow,
+                            FlightPlan = FillFlightPlanFromDto(p.Dto, 0),
+                        };
 
-                    _fsdPrefiles.Add(fsdPrefile);
+                        _fsdPrefiles.Add(fsdPrefile);
+                    }
+                    else
+                    {
+                        FsdPrefile fsdPrefile = _fsdPrefiles.Find(c => c.Callsign == p.Dto.Callsign);
+                        if (fsdPrefile == null) return;
+                        fsdPrefile.FlightPlan = FillFlightPlanFromDto(p.Dto, fsdPrefile.FlightPlan.RevisionId);
+                    }
                 }
                 else
                 {
                     FsdPilot fsdPilot = _fsdPilots.Find(c => c.Callsign == p.Dto.Callsign);
                     if (fsdPilot == null) return;
-                    fsdPilot.FlightPlan = FillFlightPlanFromDto(p.Dto);
+                    fsdPilot.FlightPlan = FillFlightPlanFromDto(p.Dto, fsdPilot.FlightPlan?.RevisionId ?? 0);
                 }
 
                 await SendKafkaMessage(p.Dto);
@@ -286,7 +301,7 @@ namespace VATSIM.Network.Dataserver
             }
         }
 
-        private static FlightPlan FillFlightPlanFromDto(FlightPlanDto dto)
+        private static FlightPlan FillFlightPlanFromDto(FlightPlanDto dto, int oldRevisionId)
         {
             return new FlightPlan
             {
@@ -303,7 +318,8 @@ namespace VATSIM.Network.Dataserver
                 EnrouteTime = FormatFsdTime(dto.HoursEnroute, dto.MinutesEnroute),
                 FuelTime = FormatFsdTime(dto.HoursFuel, dto.MinutesFuel),
                 Remarks = dto.Remarks.ToUpper(),
-                Route = dto.Route.ToUpper()
+                Route = dto.Route.ToUpper(),
+                RevisionId = oldRevisionId + 1
             };
         }
         private static string AircraftFaa(string aircraft)
@@ -613,8 +629,7 @@ namespace VATSIM.Network.Dataserver
                 p.Dto.Cid = fsdController.Cid.ToString();
                 p.Dto.Realname = fsdController.Name;
             }
-
-            Console.WriteLine($"Wallop from {p.Dto.From} - {p.Dto.Realname}");
+            
             await SendKafkaMessage(p.Dto);
         }
 
@@ -635,8 +650,7 @@ namespace VATSIM.Network.Dataserver
                 p.Dto.Cid = fsdController.Cid.ToString();
                 p.Dto.Realname = fsdController.Name;
             }
-
-            Console.WriteLine($"Broadcast from {p.Dto.From} - {p.Dto.Realname}");
+            
             await SendKafkaMessage(p.Dto);
         }
 
@@ -712,9 +726,9 @@ namespace VATSIM.Network.Dataserver
                     fsdPilot.PilotRating = response.PilotRating;
                     fsdPilot.PilotRatingSet = true;
                 }
-                catch (Exception excep)
+                catch (Exception ex)
                 {
-                    Console.WriteLine(excep);
+                    Console.WriteLine(ex);
                 }
             }
         }
@@ -732,12 +746,15 @@ namespace VATSIM.Network.Dataserver
                 _totalAtcConnectionsCounter.WithLabels(fsdServer.Name).Set(controllers.Count(c => c.Server == fsdServer.Name));
                 _totalPilotConnectionsCounter.WithLabels(fsdServer.Name).Set(pilots.Count(c => c.Server == fsdServer.Name));
 
-                _atisStatusCounter.WithLabels("true", fsdServer.Name).Set(atiss.Count(c => c.Server == fsdServer.Name && c.TextAtis.Count == 0));
-                _atisStatusCounter.WithLabels("false", fsdServer.Name).Set(atiss.Count(c => c.Server == fsdServer.Name && c.TextAtis.Count > 0));
-
-                _spacesWritesCounter.WithLabels("success").Set(_s3WriteSuccess);
-                _spacesWritesCounter.WithLabels("error").Set(_s3WriteFail);
+                _atisStatusCounter.WithLabels("true", fsdServer.Name).Set(atiss.Count(c => c.Server == fsdServer.Name && (c.TextAtis == null || c.TextAtis.Count == 0)));
+                _atisStatusCounter.WithLabels("false", fsdServer.Name).Set(atiss.Count(c => c.Server == fsdServer.Name && (c.TextAtis != null && c.TextAtis.Count > 0)));
             }
+
+
+            _spacesWritesCounter.WithLabels("success").Set(_s3WriteSuccess);
+            _spacesWritesCounter.WithLabels("error").Set(_s3WriteFail);
+
+            _prefilesCounter.Set(_fsdPrefiles.Count);
 
             List<int> cids = pilots.Select(pilot => pilot.Cid).ToList();
             cids.AddRange(controllers.Select(controller => controller.Cid));
