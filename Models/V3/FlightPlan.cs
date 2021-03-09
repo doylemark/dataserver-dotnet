@@ -1,4 +1,6 @@
-﻿namespace VATSIM.Network.Dataserver.Models.V3
+﻿using Newtonsoft.Json;
+
+namespace VATSIM.Network.Dataserver.Models.V3
 {
     public class FlightPlan
     {
@@ -17,5 +19,8 @@
         public string Remarks { get; set; }
         public string Route { get; set; }
         public int RevisionId { get; set; }
+        [JsonIgnore] public int AssignedTransponder { get; set; }
+        [JsonIgnore] public int HardLocked { get; set; }
+        [JsonIgnore] public string ModifiedByCid { get; set; }
     }
 }

@@ -214,14 +214,14 @@ namespace VATSIM.Network.Dataserver
 
         private void FsdConsumer_ClientTimerElapsed(object source, ElapsedEventArgs e)
         {
-            AtcDataDto atcDataDto = new AtcDataDto("*", ConsumerName, DtoCount, 1, ConsumerCallsign, "99999", 1, 100, 1, 0.00000, 0.00000);
+            AtcDataDto atcDataDto = new AtcDataDto("*", ConsumerName, DtoCount, 1, ConsumerCallsign, "99999", 1, 100, 12, 0.00000, 0.00000);
             Client.Write(atcDataDto + "\r\n");
             DtoCount++;
         }
 
         public void AddClient()
         {
-            AddClientDto addClientDto = new AddClientDto("*", ConsumerName, DtoCount, 1, "0", ConsumerName, ConsumerCallsign, 2, 1, 100, ConsumerCallsign, -1, 1);
+            AddClientDto addClientDto = new AddClientDto("*", ConsumerName, DtoCount, 1, "0", ConsumerName, ConsumerCallsign, 2, 12, 100, ConsumerCallsign, -1, 1);
             Client.Write(addClientDto + "\r\n");
             DtoCount++;
         }

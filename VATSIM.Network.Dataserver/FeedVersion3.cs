@@ -9,14 +9,13 @@ using System.Timers;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using VATSIM.Network.Dataserver.Models;
+using VATSIM.Network.Dataserver.HttpModels;
 using VATSIM.Network.Dataserver.Models.Resources;
 using Amazon.S3;
 using Newtonsoft.Json;
 using Amazon.S3.Model;
 using Newtonsoft.Json.Serialization;
 using Prometheus;
-using FsdServer = VATSIM.Network.Dataserver.Models.V3.FsdServer;
 
 namespace VATSIM.Network.Dataserver
 {

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
@@ -6,11 +6,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="AWSSDK.S3" Version="3.5.5.2" />
-        <PackageReference Include="Confluent.Kafka" Version="1.5.2" />
-        <PackageReference Include="Elastic.Apm" Version="1.7.0" />
+        <PackageReference Include="AWSSDK.S3" Version="3.5.9.4" />
+        <PackageReference Include="Confluent.Kafka" Version="1.6.2" />
+        <PackageReference Include="Elastic.Apm" Version="1.8.1" />
         <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
-        <PackageReference Include="prometheus-net" Version="4.0.0" />
+        <PackageReference Include="prometheus-net" Version="4.1.1" />
         <PackageReference Include="RestSharp" Version="106.11.7" />
         <PackageReference Include="SimpleTCP" Version="1.0.24" />
     </ItemGroup>

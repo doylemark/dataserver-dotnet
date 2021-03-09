@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using Newtonsoft.Json;
 using RestSharp;
 using System.Threading.Tasks;
 using VATSIM.Network.Dataserver.Models;
+using VATSIM.Network.Dataserver.HttpModels;
 
 namespace VATSIM.Network.Dataserver.Services
 {
@@ -24,3 +25,4 @@ namespace VATSIM.Network.Dataserver.Services
         }
     }
 }
+ 

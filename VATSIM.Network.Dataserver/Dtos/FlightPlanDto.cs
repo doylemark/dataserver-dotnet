@@ -23,14 +23,16 @@ namespace VATSIM.Network.Dataserver.Dtos
         public string Remarks { get; }
         public string Route { get; }
         public string Cid { get; }
-        public string RealName { get; set; }
-        public bool Prefile { get; set; }
+        public int AssignedTransponder { get; }
+        public int HardLocked { get; }
+        public string ModifiedByCid { get; }
+
 
         public FlightPlanDto(string destination, string source, int packetNumber, int hopCount, string callsign,
             string revision, string type, string aircraft, string cruiseSpeed, string departureAirport,
             string estimatedDepartureTime, string actualDepartureTime, string altitude, string destinationAirport,
             string hoursEnroute, string minutesEnroute, string hoursFuel, string minutesFuel, string alternateAirport,
-            string remarks, string route, string cid) : base(destination, source, packetNumber, hopCount)
+            string remarks, string route, string cid, string modifiedby, int assignedtranspoonder, int hardlock) : base(destination, source, packetNumber, hopCount)
         {
             Callsign = callsign;
             Revision = revision;
@@ -50,7 +52,9 @@ namespace VATSIM.Network.Dataserver.Dtos
             Remarks = remarks;
             Route = route;
             Cid = cid;
-            Prefile = false;
+            ModifiedByCid = modifiedby;
+            AssignedTransponder = assignedtranspoonder;
+            HardLocked = hardlock;
         }
 
         public static FlightPlanDto Deserialize(string payload)
@@ -66,7 +70,7 @@ namespace VATSIM.Network.Dataserver.Dtos
                 return new FlightPlanDto(fields[0], fields[1], Convert.ToInt32(fields[2][1..]),
                     Convert.ToInt32(fields[3]), fields[4], fields[5], fields[6], fields[7],
                     fields[8], fields[9], fields[10], fields[11], fields[12], fields[13], fields[14], fields[15],
-                    fields[16], fields[17], fields[18], fields[19], fields[20], fields[21]);
+                    fields[16], fields[17], fields[18], fields[19], fields[20], fields[21], fields[22], Convert.ToInt32(fields[23]), Convert.ToInt32(fields[24]));
             }
             catch (Exception e)
             {

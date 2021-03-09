@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 
-namespace VATSIM.Network.Dataserver.Models
+namespace VATSIM.Network.Dataserver.HttpModels
 {
     public class ApiUserData
     {
