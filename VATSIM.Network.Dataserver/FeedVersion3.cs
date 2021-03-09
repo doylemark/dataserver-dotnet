@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Timer = System.Timers.Timer;
+using VATSIM.Network.Dataserver.Models;
 using VATSIM.Network.Dataserver.Models.V3;
 using VATSIM.Network.Dataserver.Services;
 using VATSIM.Network.Dataserver.Dtos;
@@ -202,11 +203,18 @@ namespace VATSIM.Network.Dataserver
             await SendKafkaMessage(p.Dto);
         }
 
-        private void FsdConsumer_RemoveClientDtoReceived(object sender, DtoReceivedEventArgs<RemoveClientDto> p)
+        private async void FsdConsumer_RemoveClientDtoReceived(object sender, DtoReceivedEventArgs<RemoveClientDto> p)
         {
+            if (p.Dto.Callsign == "AFVDATA" || p.Dto.Callsign == "SUP" || p.Dto.Callsign == "DATA" || p.Dto.Callsign == "DATASVR" || p.Dto.Callsign.Contains("DCLIENT") || p.Dto.Callsign == "DATA-TOR" || (p.Dto.Callsign.Length > 3 && p.Dto.Callsign.Substring(0, 4) == "AFVS"))
+            {
+                return;
+            }
+
             _fsdPilots.RemoveAll(c => c.Callsign == p.Dto.Callsign);
             _fsdControllers.RemoveAll(c => c.Callsign == p.Dto.Callsign);
             _fsdAtiss.RemoveAll(c => c.Callsign == p.Dto.Callsign);
+
+            await SendKafkaMessage(p.Dto);
         }
 
         private async void FsdConsumer_PilotDataDtoReceived(object sender, DtoReceivedEventArgs<PilotDataDto> p)
@@ -273,7 +281,7 @@ namespace VATSIM.Network.Dataserver
                             Name = $"{response.FirstName} {response.LastName}",
                             Callsign = p.Dto.Callsign,
                             LastUpdated = DateTime.UtcNow,
-                            FlightPlan = FillFlightPlanFromDto(p.Dto, 0),
+                            FlightPlan = FillFlightPlanFromDto(p.Dto),
                         };
 
                         _fsdPrefiles.Add(fsdPrefile);
@@ -282,16 +290,16 @@ namespace VATSIM.Network.Dataserver
                     {
                         FsdPrefile fsdPrefile = _fsdPrefiles.Find(c => c.Callsign == p.Dto.Callsign);
                         if (fsdPrefile == null) return;
-                        fsdPrefile.FlightPlan = FillFlightPlanFromDto(p.Dto, fsdPrefile.FlightPlan.RevisionId);
+                        fsdPrefile.FlightPlan = FillFlightPlanFromDto(p.Dto);
                     }
                 }
                 else
                 {
                     FsdPilot fsdPilot = _fsdPilots.Find(c => c.Callsign == p.Dto.Callsign);
                     if (fsdPilot == null) return;
-                    fsdPilot.FlightPlan = FillFlightPlanFromDto(p.Dto, fsdPilot.FlightPlan?.RevisionId ?? 0);
+                    fsdPilot.FlightPlan = FillFlightPlanFromDto(p.Dto);
                 }
-
+                
                 await SendKafkaMessage(p.Dto);
             }
             catch (Exception e)
@@ -300,7 +308,7 @@ namespace VATSIM.Network.Dataserver
             }
         }
 
-        private static FlightPlan FillFlightPlanFromDto(FlightPlanDto dto, int oldRevisionId)
+        private static FlightPlan FillFlightPlanFromDto(FlightPlanDto dto)
         {
             return new FlightPlan
             {
@@ -318,7 +326,7 @@ namespace VATSIM.Network.Dataserver
                 FuelTime = FormatFsdTime(dto.HoursFuel, dto.MinutesFuel),
                 Remarks = dto.Remarks.ToUpper(),
                 Route = dto.Route.ToUpper(),
-                RevisionId = oldRevisionId + 1
+                RevisionId = int.Parse(dto.Revision)
             };
         }
         private static string AircraftFaa(string aircraft)
@@ -706,9 +714,9 @@ namespace VATSIM.Network.Dataserver
 
         private void RemoveTimedOutConnections(object source, ElapsedEventArgs e)
         {
-            _fsdControllers.RemoveAll(c => (DateTime.UtcNow - c.LastUpdated).Minutes > 4);
-            _fsdAtiss.RemoveAll(c => (DateTime.UtcNow - c.LastUpdated).Minutes > 4);
-            _fsdPilots.RemoveAll(c => (DateTime.UtcNow - c.LastUpdated).Minutes > 4);
+            _fsdControllers.RemoveAll(c => (DateTime.UtcNow - c.LastUpdated).Minutes > 2);
+            _fsdAtiss.RemoveAll(c => (DateTime.UtcNow - c.LastUpdated).Minutes > 2);
+            _fsdPilots.RemoveAll(c => (DateTime.UtcNow - c.LastUpdated).Minutes > 2);
             _fsdPrefiles.RemoveAll(p => (DateTime.UtcNow - p.LastUpdated).Hours > 2);
         }
 
